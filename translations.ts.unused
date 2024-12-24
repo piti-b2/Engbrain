@@ -1,0 +1,102 @@
+export const translations = {
+  en: {
+    dashboard: "Dashboard",
+    menu: "Menu",
+    home: "Home",
+    tools: "Tools",  // เพิ่มบรรทัดนี้
+    courses: "Courses",
+    profile: "Profile",
+    progress: "Progress",
+    welcome: "Welcome",
+    certificates: "Certificates",
+    scoreboard: "Scoreboard",
+    homework: "Homework",
+    rewards: "Rewards",
+    minigames: "Mini Games",
+    exam: "Exam",
+    currentCourses: "Current Courses",
+    totalLearningTime: "Total Learning Time",
+    totalScore: "Total Score",
+    accessLearningMaterials: "Access your learning materials",
+    freeMember: "Free Member",
+    editProfile: "Edit Profile",
+    learningHistory: "Learning History",
+    helpCenter: "Help Center",
+    userGuide: "User Guide",
+    reportProblem: "Report Problem",
+    contactUs: "Contact Us",
+    signOut: "Sign Out",
+    transactionHistory: "Transaction History",
+    type: "Type",
+    description: "Description",
+    amount: "Amount",
+    balance: "Balance",
+    date: "Date",
+    status: "Status",
+    page: "Page",
+    of: "of",
+    payment: {
+      title: "Top Up Coins",
+      description: "Choose a coin package to top up your balance",
+      buyButton: "Buy Now",
+      processing: "Processing...",
+      history: {
+        title: "Transaction History",
+        empty: "No transactions yet"
+      },
+      balance: {
+        title: "Current Balance"
+      }
+    }
+  },
+  th: {
+    dashboard: "แดชบอร์ด",
+    menu: "เมนู",
+    home: "หน้าหลัก",
+    courses: "คอร์สเรียน",
+    tools: "เครื่องมือ",  // เพิ่มบรรทัดนี้
+    profile: "โปรไฟล์",
+    progress: "ความคืบหน้า",
+    welcome: "สวัสดี",
+    certificates: "ประกาศนียบัตร",
+    scoreboard: "คะแนนจัดอันดับ",
+    homework: "การบ้าน",
+    rewards: "แลกของรางวัล",
+    minigames: "มินิเกมส์",
+    exam: "ทดสอบ",
+    currentCourses: "คอร์สที่กำลังเรียน",
+    totalLearningTime: "เวลาเรียนทั้งหมด",
+    totalScore: "คะแนนรวม",
+    accessLearningMaterials: "เข้าถึงบทเรียนของคุณ",
+    freeMember: "สมาชิกฟรี",
+    editProfile: "แก้ไขโปรไฟล์",
+    learningHistory: "ประวัติการเรียน",
+    helpCenter: "ศูนย์ช่วยเหลือ",
+    userGuide: "คู่มือการใช้งาน",
+    reportProblem: "แจ้งปัญหา",
+    contactUs: "ติดต่อเรา",
+    signOut: "ออกจากระบบ",
+    transactionHistory: "ประวัติธุรกรรม",
+    type: "ประเภท",
+    description: "รายละเอียด",
+    amount: "จำนวน",
+    balance: "ยอดคงเหลือ",
+    date: "วันที่",
+    status: "สถานะ",
+    page: "หน้า",
+    of: "จาก",
+    payment: {
+      title: "เติมเหรียญ",
+      description: "เลือกแพ็คเกจเหรียญที่ต้องการ",
+      buyButton: "ซื้อเลย",
+      processing: "กำลังดำเนินการ...",
+      history: {
+        title: "ประวัติการเติมเหรียญ",
+        empty: "ยังไม่มีประวัติการเติมเหรียญ"
+      },
+      balance: {
+        title: "ยอดเหรียญคงเหลือ"
+      }
+    }
+  }
+};

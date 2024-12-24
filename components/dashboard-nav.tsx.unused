@@ -1,0 +1,70 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { buttonVariants } from "@/components/ui/button"
+import { BookOpen, GraduationCap, Home, ScrollText, Coins } from "lucide-react"
+
+interface NavItem {
+  title: string
+  href: string
+  icon: React.ReactNode
+}
+
+const navItems: NavItem[] = [
+  {
+    title: "หน้าหลัก",
+    href: "/dashboard",
+    icon: <Home className="w-4 h-4" />,
+  },
+  {
+    title: "คอร์สเรียน",
+    href: "/dashboard/courses",
+    icon: <BookOpen className="w-4 h-4" />,
+  },
+  {
+    title: "การบ้าน",
+    href: "/dashboard/homework",
+    icon: <ScrollText className="w-4 h-4" />,
+  },
+  {
+    title: "ใบประกาศ",
+    href: "/dashboard/certificates",
+    icon: <GraduationCap className="w-4 h-4" />,
+  },
+  {
+    title: "เติมเหรียญ",
+    href: "/dashboard/payment",
+    icon: <Coins className="w-4 h-4" />,
+  },
+]
+
+export function DashboardNav() {
+  const pathname = usePathname()
+
+  return (
+    <nav className="grid items-start gap-2">
+      {navItems.map((item, index) => {
+        const isActive = pathname?.startsWith(item.href)
+
+        return (
+          <Link
+            key={index}
+            href={item.href}
+            className={cn(
+              buttonVariants({ variant: "ghost" }),
+              isActive
+                ? "bg-muted hover:bg-muted"
+                : "hover:bg-transparent hover:underline",
+              "justify-start"
+            )}
+          >
+            {item.icon}
+            <span className="ml-2">{item.title}</span>
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}

@@ -1,0 +1,14 @@
+import { UserButton } from "@clerk/nextjs"
+
+export function DashboardHeader() {
+  return (
+    <header className="flex h-14 items-center gap-4 border-b bg-gray-100/40 px-6">
+      <div className="flex flex-1 items-center justify-between">
+        <div className="flex items-center gap-4">
+          <h1 className="font-semibold text-lg">Dashboard</h1>
+        </div>
+        <UserButton afterSignOutUrl="/" />
+      </div>
+    </header>
+  )
+}

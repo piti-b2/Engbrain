@@ -1,0 +1,115 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                String              @id @default(cuid())
+  name              String?
+  email             String?             @unique
+  emailVerified     DateTime?
+  image             String?
+  coins             Int                 @default(0)
+  transactions      Transaction[]
+  coinTransactions  CoinTransaction[]
+  failedTransactions FailedTransaction[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int
+  type        String   @default("payment")
+  status      String   @default("pending")
+  error       String?  // Optional field to store error messages
+  stripePaymentId String? // Stripe payment intent ID
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FailedTransaction {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Int
+  customerEmail   String?  // Customer's email from Stripe
+  customerName    String?  // Customer's name from Stripe
+  errorCode       String   // e.g., "402"
+  errorMessage    String   // Detailed error message
+  stripePaymentId String?  // Stripe payment intent ID
+  rawError        Json?    // Store complete error response
+  retryCount      Int      @default(0)
+  lastRetryAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoinPackage {
+  id            Int       @id @default(autoincrement())
+  name          String    
+  coins_amount  Int       // จำนวนเหรียญทั้งหมด
+  price         Decimal   // ราคาเป็นบาท
+  bonus_coins   Int       // จำนวนเหรียญโบนัส
+  stripe_price_id String? // Stripe Price ID
+  description   String?   @db.Text
+  is_popular    Boolean   @default(false)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now()) @db.Timestamp(6)
+  color         String?   // สีของแพ็คเกจ เช่น #FF5733
+
+  @@map("coins_packages")
+}
+
+// Enum สำหรับประเภทธุรกรรมเหรียญ
+enum CoinTransactionType {
+  CREDIT  // เพิ่มเหรียญ
+  DEBIT   // ลดเหรียญ
+}
+
+// Enum สำหรับเหตุผลการทำธุรกรรม
+enum CoinTransactionReason {
+  PURCHASE        // ซื้อเหรียญ
+  COURSE_PAYMENT  // จ่ายค่าคอร์ส
+  REWARD         // ได้รับรางวัล
+  REFUND         // คืนเงิน
+  SYSTEM_ADJUST  // ระบบปรับปรุง
+  OTHER          // อื่นๆ
+}
+
+// Enum สำหรับสถานะธุรกรรม
+enum CoinTransactionStatus {
+  PENDING    // รอดำเนินการ
+  COMPLETED  // เสร็จสมบูรณ์
+  FAILED     // ล้มเหลว
+  CANCELLED  // ยกเลิก
+}
+
+model CoinTransaction {
+  id          String               @id @default(cuid())
+  userId      String
+  amount      Int                  // จำนวนเหรียญที่เปลี่ยนแปลง
+  balance     Int                  // ยอดคงเหลือหลังทำรายการ
+  type        CoinTransactionType
+  reason      CoinTransactionReason
+  description String?              // รายละเอียดเพิ่มเติม
+  metadata    Json?                // ข้อมูลเพิ่มเติมอื่นๆ
+  status      CoinTransactionStatus @default(COMPLETED)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  
+  // Relations
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
