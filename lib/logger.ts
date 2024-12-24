@@ -1,5 +1,3 @@
-import winston, { format } from 'winston';
-
 // Log levels in order of severity
 const LOG_LEVELS = {
   error: 0,
@@ -59,28 +57,36 @@ const maskSensitiveData = (data: any): any => {
   return data;
 };
 
+// Original console methods
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn,
+  debug: console.debug,
+};
+
 const logger = {
   logInfo: (message: string, meta: any = {}) => {
     if (shouldLog('info')) {
-      console.log(`[INFO] ${message}`, maskSensitiveData(meta));
+      originalConsole.log(`[INFO] ${message}`, maskSensitiveData(meta));
     }
   },
   
   logError: (message: any, ...args: any[]) => {
     if (shouldLog('error')) {
-      console.error(`[ERROR] ${message}`, ...args.map(arg => maskSensitiveData(arg)));
+      originalConsole.error(`[ERROR] ${message}`, ...args.map(arg => maskSensitiveData(arg)));
     }
   },
   
   logWarning: (message: string, meta: any = {}) => {
     if (shouldLog('warn')) {
-      console.warn(`[WARNING] ${message}`, maskSensitiveData(meta));
+      originalConsole.warn(`[WARNING] ${message}`, maskSensitiveData(meta));
     }
   },
   
   logDebug: (message: string, meta: any = {}) => {
     if (shouldLog('debug')) {
-      console.debug(`[DEBUG] ${message}`, maskSensitiveData(meta));
+      originalConsole.debug(`[DEBUG] ${message}`, maskSensitiveData(meta));
     }
   },
 };
