@@ -51,8 +51,10 @@ const logger = {
     console.log(`[INFO] ${message}`, maskSensitiveData(meta));
   },
   
-  logError: (message: string, error: any = {}) => {
-    console.error(`[ERROR] ${message}`, maskSensitiveData(error));
+  logError: (message: any, ...args: any[]) => {
+    if (shouldLog('error')) {
+      console.error(`[ERROR] ${message}`, ...args);
+    }
   },
   
   logWarning: (message: string, meta: any = {}) => {
