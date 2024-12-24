@@ -12,23 +12,23 @@ const originalConsole = {
 // Override console methods in production
 if (process.env.NODE_ENV === 'production') {
   console.log = (...args) => {
-    logger.info(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+    logger.logInfo(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
   };
 
   console.info = (...args) => {
-    logger.info(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+    logger.logInfo(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
   };
 
   console.warn = (...args) => {
-    logger.warn(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+    logger.logWarning(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
   };
 
   console.error = (...args) => {
-    logger.error(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+    logger.logError(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
   };
 
   console.debug = (...args) => {
-    logger.debug(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
+    logger.logDebug(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' '));
   };
 }
 
