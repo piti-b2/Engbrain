@@ -14,7 +14,7 @@ if (process.env.NODE_ENV === 'production' || process.env.NEXT_PUBLIC_DISABLE_LOG
 export function middleware(request: NextRequest) {
   // Log only if needed
   if (process.env.LOG_LEVEL === 'debug') {
-    logger.debug(`Request: ${request.method} ${request.url}`);
+    logger.logDebug(`Request: ${request.method} ${request.url}`);
   }
 
   return NextResponse.next();
