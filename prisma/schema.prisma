@@ -1,115 +1,229 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id                String              @id @default(cuid())
-  name              String?
-  email             String?             @unique
-  emailVerified     DateTime?
-  image             String?
-  coins             Int                 @default(0)
-  transactions      Transaction[]
-  coinTransactions  CoinTransaction[]
-  failedTransactions FailedTransaction[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-}
-
-model Transaction {
-  id          String   @id @default(cuid())
-  userId      String
-  amount      Int
-  type        String   @default("payment")
-  status      String   @default("pending")
-  error       String?  // Optional field to store error messages
-  stripePaymentId String? // Stripe payment intent ID
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model FailedTransaction {
-  id              String   @id @default(cuid())
-  userId          String
-  amount          Int
-  customerEmail   String?  // Customer's email from Stripe
-  customerName    String?  // Customer's name from Stripe
-  errorCode       String   // e.g., "402"
-  errorMessage    String   // Detailed error message
-  stripePaymentId String?  // Stripe payment intent ID
-  rawError        Json?    // Store complete error response
-  retryCount      Int      @default(0)
-  lastRetryAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String            @id @default(cuid())
+  clerkId          String            @unique
+  name             String?
+  email            String?           @unique
+  emailVerified    DateTime?
+  image            String?
+  coins            Int               @default(0)
+  createdAt        DateTime          @default(now()) @map("createdAt")
+  updatedAt        DateTime          @default(now()) @map("updatedAt")
+  coinTransactions CoinTransaction[]
+  transactions     Transaction[]
 }
 
 model CoinPackage {
-  id            Int       @id @default(autoincrement())
-  name          String    
-  coins_amount  Int       // จำนวนเหรียญทั้งหมด
-  price         Decimal   // ราคาเป็นบาท
-  bonus_coins   Int       // จำนวนเหรียญโบนัส
-  stripe_price_id String? // Stripe Price ID
-  description   String?   @db.Text
-  is_popular    Boolean   @default(false)
-  is_active     Boolean   @default(true)
-  created_at    DateTime  @default(now()) @db.Timestamp(6)
-  color         String?   // สีของแพ็คเกจ เช่น #FF5733
-
-  @@map("coins_packages")
+  id           String        @id @default(cuid())
+  name         String
+  price        Decimal       @db.Decimal(10, 2)
+  coins        Int
+  bonus        Int
+  active       Boolean       @default(true)
+  color        String
+  tag          String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  transactions Transaction[]
 }
 
-// Enum สำหรับประเภทธุรกรรมเหรียญ
-enum CoinTransactionType {
-  CREDIT  // เพิ่มเหรียญ
-  DEBIT   // ลดเหรียญ
-}
-
-// Enum สำหรับเหตุผลการทำธุรกรรม
-enum CoinTransactionReason {
-  PURCHASE        // ซื้อเหรียญ
-  COURSE_PAYMENT  // จ่ายค่าคอร์ส
-  REWARD         // ได้รับรางวัล
-  REFUND         // คืนเงิน
-  SYSTEM_ADJUST  // ระบบปรับปรุง
-  OTHER          // อื่นๆ
-}
-
-// Enum สำหรับสถานะธุรกรรม
-enum CoinTransactionStatus {
-  PENDING    // รอดำเนินการ
-  COMPLETED  // เสร็จสมบูรณ์
-  FAILED     // ล้มเหลว
-  CANCELLED  // ยกเลิก
+model Transaction {
+  id                String             @id @default(cuid())
+  userId            String
+  amount            Int
+  type              String             @default("payment")
+  status            String             @default("pending")
+  error             String?
+  stripePaymentId   String?
+  coinPackageId     String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  transactionStatus TransactionStatus?
+  errorCode         String?
+  failureMessage    String?
+  coinPackage       CoinPackage?       @relation(fields: [coinPackageId], references: [id])
+  user              User               @relation(fields: [userId], references: [id])
 }
 
 model CoinTransaction {
-  id          String               @id @default(cuid())
+  id          String                @id @default(cuid())
   userId      String
-  amount      Int                  // จำนวนเหรียญที่เปลี่ยนแปลง
-  balance     Int                  // ยอดคงเหลือหลังทำรายการ
-  type        CoinTransactionType
+  amount      Int
+  createdAt   DateTime              @default(now())
+  balance     Int
+  description String?
+  metadata    Json?
   reason      CoinTransactionReason
-  description String?              // รายละเอียดเพิ่มเติม
-  metadata    Json?                // ข้อมูลเพิ่มเติมอื่นๆ
-  status      CoinTransactionStatus @default(COMPLETED)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
-  
-  // Relations
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      CoinTransactionStatus
+  updatedAt   DateTime              @updatedAt
+  type        CoinTransactionType
+  user        User                  @relation(fields: [userId], references: [id])
+}
 
-  @@index([userId, createdAt])
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model admin_users {
+  id            String    @id
+  username      String    @unique @db.VarChar(255)
+  email         String    @unique @db.VarChar(255)
+  password_hash String
+  role          String    @db.VarChar(50)
+  status        String?   @default("active") @db.VarChar(20)
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model categories {
+  id             String    @id
+  name_th        String    @db.VarChar(255)
+  name_en        String    @db.VarChar(255)
+  description_th String?
+  description_en String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+  updated_at     DateTime? @default(now()) @db.Timestamp(6)
+  courses        courses[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model course_access {
+  id               Int                @id @default(autoincrement())
+  user_id          String
+  course_id        String?
+  purchase_date    DateTime?          @default(now()) @db.Timestamp(6)
+  expiry_date      DateTime?          @db.Timestamp(6)
+  access_type      course_access_type
+  status           String?            @default("ACTIVE") @db.VarChar(20)
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  package_id       Int?
+  is_free          Boolean?           @default(false)
+  daily_limit      Int?
+  usage_count      Int?               @default(0)
+  last_used_date   DateTime?          @db.Date
+  transition_date  DateTime?          @db.Timestamp(6)
+  transition_limit Int?
+  courses          courses?           @relation(fields: [course_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  course_packages  course_packages?   @relation(fields: [package_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model course_packages {
+  id              Int             @id @default(autoincrement())
+  course_id       String?
+  name_th         String          @db.VarChar(255)
+  name_en         String          @db.VarChar(255)
+  duration_days   Int
+  price           Decimal         @db.Decimal(10, 2)
+  original_price  Decimal?        @db.Decimal(10, 2)
+  status          String?         @default("ACTIVE") @db.VarChar(20)
+  is_default      Boolean?        @default(false)
+  sequence_number Int?
+  created_at      DateTime?       @default(now()) @db.Timestamp(6)
+  updated_at      DateTime?       @default(now()) @db.Timestamp(6)
+  is_free         Boolean?        @default(false)
+  daily_limit     Int?
+  course_access   course_access[]
+  courses         courses?        @relation(fields: [course_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([course_id], map: "idx_course_packages_course")
+  @@index([status], map: "idx_course_packages_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model courses {
+  id              String            @id
+  title_th        String            @db.VarChar(255)
+  title_en        String            @db.VarChar(255)
+  description_th  String?
+  description_en  String?
+  thumbnail_url   String?
+  course_type     String            @db.VarChar(50)
+  level           String?           @db.VarChar(50)
+  category_id     String?
+  price           Decimal?          @db.Decimal(10, 2)
+  status          String?           @default("DRAFT") @db.VarChar(20)
+  created_at      DateTime?         @default(now()) @db.Timestamp(6)
+  updated_at      DateTime?         @default(now()) @db.Timestamp(6)
+  is_free         Boolean?          @default(false)
+  expiry_date     DateTime?         @db.Timestamp(6)
+  access_duration Int?
+  course_access   course_access[]
+  course_packages course_packages[]
+  categories      categories?       @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lessons         lessons[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lessons {
+  id              Int       @id @default(autoincrement())
+  course_id       String?
+  title_th        String    @db.VarChar(255)
+  title_en        String    @db.VarChar(255)
+  description_th  String?
+  description_en  String?
+  sequence_number Int
+  lesson_type     String    @db.VarChar(50)
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  courses         courses?  @relation(fields: [course_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum CoinTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum CoinTransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum CoinTransactionReason {
+  PURCHASE
+  REWARD
+  SPEND
+  REFUND
+  COURSE_COMPLETION
+  HOMEWORK_SUBMISSION
+}
+
+enum TransactionStatus {
+  COMPLETED
+  FAILED
+  PENDING
+}
+
+enum cointransactionreason {
+  PURCHASE_PACKAGE
+  PURCHASE
+  REWARD
+  SPEND
+  REFUND
+  COURSE_COMPLETION
+  HOMEWORK_SUBMISSION
+}
+
+enum cointransactionstatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum cointransactiontype {
+  CREDIT
+  DEBIT
+}
+
+enum course_access_type {
+  FREE
+  PREMIUM
 }

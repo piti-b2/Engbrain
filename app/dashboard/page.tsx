@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import DashboardComponent from "@/components/dashboard";
+import UserProfile from "@/components/UserProfile";
 import { useLanguage } from "@/context/LanguageContext";
 import { translations } from "@/translations";
 
@@ -102,6 +103,9 @@ function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* User Profile */}
+        <UserProfile />
       </div>
     </DashboardComponent>
   );

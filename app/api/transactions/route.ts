@@ -1,104 +1,125 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import prisma from '@/lib/prisma';
+import { prismaClient } from '@/lib/prisma';
+import logger from '@/lib/logger';
+import { Prisma, TransactionStatus } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 export async function GET() {
   try {
     const { userId } = auth();
     
     if (!userId) {
-      console.log('No userId found in auth context');
+      logger.logWarning('No userId found in auth context');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('Fetching transactions for user:', userId);
+    logger.logInfo('Fetching transactions for user', { userId });
     
     try {
-      // Check if user exists
-      const user = await prisma.user.findUnique({
-        where: { id: userId }
+      // Check if user exists and update profile if needed
+      const dbUser = await prismaClient.user.findUnique({
+        where: { clerkId: userId }
       });
 
-      if (!user) {
-        console.error('User not found:', userId);
-        // สร้างข้อมูลผู้ใช้ใหม่ถ้ายังไม่มี
-        await prisma.user.create({
+      if (!dbUser) {
+        logger.logInfo('Creating new user', { 
+          clerkId: userId,
+          email: auth()?.user?.emailAddresses?.[0]?.emailAddress,
+          name: auth()?.user?.firstName ? `${auth()?.user?.firstName} ${auth()?.user?.lastName || ''}`.trim() : undefined
+        });
+        
+        const newUser = await prismaClient.user.create({
           data: {
-            id: userId,
+            clerkId: userId,
+            email: auth()?.user?.emailAddresses?.[0]?.emailAddress,
+            name: auth()?.user?.firstName ? `${auth()?.user?.firstName} ${auth()?.user?.lastName || ''}`.trim() : undefined,
             coins: 0
+          }
+        });
+        
+        const transactions = await prismaClient.transaction.findMany({
+          where: {
+            userId: newUser.id,
+            type: 'payment',
+            status: 'completed'
+          },
+          include: {
+            coinPackage: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        });
+
+        return NextResponse.json(transactions);
+      }
+      
+      if (dbUser && (!dbUser.email || !dbUser.name)) {
+        // Update user profile if email or name is missing
+        logger.logInfo('Updating user profile', { userId });
+        await prismaClient.user.update({
+          where: { clerkId: userId },
+          data: {
+            email: auth()?.user?.emailAddresses?.[0]?.emailAddress || dbUser.email,
+            name: auth()?.user?.firstName ? `${auth()?.user?.firstName} ${auth()?.user?.lastName || ''}`.trim() : dbUser.name
           }
         });
       }
 
-      const transactions = await prisma.transaction.findMany({
+      const transactions = await prismaClient.transaction.findMany({
         where: {
-          userId: userId
+          userId: dbUser.id,
+          type: 'payment',
+          status: 'completed'
+        },
+        include: {
+          coinPackage: true
         },
         orderBy: {
           createdAt: 'desc'
-        },
-        select: {
-          id: true,
-          amount: true,
-          status: true,
-          createdAt: true,
-          type: true
         }
       });
 
-      console.log('Raw transactions:', JSON.stringify(transactions, null, 2));
-      
-      // Format transactions to match the Transaction interface
-      const formattedTransactions = transactions.map((tx: {
-        id: string;
-        amount: number;
-        status: string;
-        createdAt: Date;
-        type: string;
-      }) => ({
+      // Format transactions
+      const formattedTransactions = transactions.map((tx: any) => ({
         id: tx.id,
+        userId: tx.userId,
         amount: tx.amount,
+        type: tx.type,
         status: tx.status,
         createdAt: new Date(tx.createdAt).toISOString(),
+        updatedAt: new Date(tx.updatedAt).toISOString()
       }));
 
-      console.log('Formatted transactions:', JSON.stringify(formattedTransactions, null, 2));
-      
-      return new NextResponse(JSON.stringify(formattedTransactions), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      logger.logInfo('Successfully fetched transactions', { 
+        userId, 
+        count: formattedTransactions.length 
       });
+      
+      return NextResponse.json(formattedTransactions);
 
-    } catch (dbError: any) {
-      console.error('Database error:', dbError);
-      console.error('Error stack:', dbError.stack);
-      console.error('Error code:', dbError.code);
-      console.error('Error message:', dbError.message);
+    } catch (dbError) {
+      logger.logError('Database error:', dbError);
       throw dbError;
     }
 
-  } catch (error: any) {
-    console.error('Error in transactions API:', error);
-    console.error('Error stack:', error.stack);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code
-    });
+  } catch (error: unknown) {
+    logger.logError('Error in transactions API:', error);
     
-    // Return appropriate error response
-    if (error.code === 'P2002') {
-      return NextResponse.json({ 
-        error: 'Database constraint violation',
-        details: error.message 
-      }, { status: 409 });
+    if (error instanceof PrismaClientKnownRequestError) {
+      if (error.code === 'P2002') {
+        return NextResponse.json({ 
+          error: 'Database constraint violation',
+          details: error.message 
+        }, { status: 409 });
+      }
     }
     
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ 
       error: 'Internal Server Error',
-      details: error.message || 'An unexpected error occurred'
+      details: errorMessage
     }, { status: 500 });
   }
 }

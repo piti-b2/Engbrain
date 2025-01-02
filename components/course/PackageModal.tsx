@@ -28,7 +28,7 @@ interface Package {
   is_default: boolean;
   sequence_number: number;
   is_free?: boolean;
-  daily_limit?: number;
+  daily_limit: number;
 }
 
 export default function PackageModal({ isOpen, onClose, courseId, onSelectPackage }: PackageModalProps) {
@@ -38,6 +38,7 @@ export default function PackageModal({ isOpen, onClose, courseId, onSelectPackag
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [userCoins, setUserCoins] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
   const { user } = useUser();
   const supabase = createClientComponentClient();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -49,64 +50,157 @@ export default function PackageModal({ isOpen, onClose, courseId, onSelectPackag
       setIsLoading(true);
 
       try {
-        // โหลดข้อมูลเหรียญจากตาราง User
+        // โหลดข้อมูลผู้ใช้จากตาราง User
         const { data: userData, error: userError } = await supabase
           .from('User')
-          .select('coins')
-          .eq('id', user.id)
-          .single();
+          .select('id, coins')
+          .eq('clerkId', user.id)
+          .maybeSingle();
 
-        if (userError) throw userError;
-        setUserCoins(userData?.coins || 0);
+        if (userError) {
+          console.error('Error fetching user data:', userError);
+          return;
+        }
+
+        // ถ้าไม่พบข้อมูลผู้ใช้ ให้สร้างใหม่
+        if (!userData) {
+          const { data: newUser, error: createError } = await supabase
+            .from('User')
+            .insert([{ 
+              clerkId: user.id,
+              coins: 0,
+            }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('Error creating user:', createError);
+            return;
+          }
+
+          setUserId(newUser.id);
+          setUserCoins(0);
+        } else {
+          setUserId(userData.id);
+          setUserCoins(userData.coins);
+        }
 
         // โหลดข้อมูลแพ็คเกจ
         const { data: packagesData, error: packagesError } = await supabase
-          .from('course_packages')
+          .from('packages')
           .select('*')
           .eq('course_id', courseId)
-          .order('price', { ascending: true });
+          .eq('status', 'active')
+          .order('sequence_number', { ascending: true });
 
-        if (packagesError) throw packagesError;
-        setPackages(packagesData || []);
+        if (packagesError) {
+          console.error('Error loading packages:', packagesError);
+          return;
+        }
 
+        // กำหนดค่า daily_limit เริ่มต้นถ้าไม่มีค่า
+        const processedPackages = packagesData.map(pkg => ({
+          ...pkg,
+          daily_limit: pkg.daily_limit || 5 // กำหนดค่าเริ่มต้นเป็น 5 ครั้งต่อวัน
+        }));
+
+        setPackages(processedPackages);
       } catch (error) {
-        console.error('Error loading data:', error);
-        toast({
-          variant: "destructive",
-          title: language === 'th'
-            ? 'เกิดข้อผิดพลาดในการโหลดข้อมูล'
-            : 'Error loading data'
-        });
+        console.error('Error in loadData:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen, user, courseId, language]);
+    loadData();
+  }, [user, courseId, supabase]);
+
+  // แสดงจำนวนเหรียญในส่วนบนของ modal
+  useEffect(() => {
+    console.log('Current user coins:', userCoins); // Debug log
+  }, [userCoins]);
 
   // จัดการเมื่อเลือกแพ็คเกจ
-  const handleSelectPackage = async (pkg: Package) => {
-    if (!user) {
+  const handleSelectPackage = async (selectedPackage: Package) => {
+    if (!user || !userId) return;
+    setIsProcessing(true);
+
+    try {
+      // ถ้าเป็นแพ็คเกจฟรี
+      if (selectedPackage.is_free) {
+        // เรียกใช้ stored procedure
+        const { data: result, error } = await supabase.rpc(
+          'create_course_access',
+          {
+            p_user_id: userId, // ใช้ User.id แทน clerkId
+            p_course_id: courseId,
+            p_package_id: parseInt(selectedPackage.id),
+            p_duration_days: selectedPackage.duration_days,
+            p_is_free: true,
+            p_daily_limit: selectedPackage.daily_limit
+          }
+        );
+
+        if (error) {
+          console.error('Error creating access:', error);
+          toast({
+            variant: "destructive",
+            title: language === 'th' ? "เกิดข้อผิดพลาด" : "Error",
+            description: error.message,
+            className: "fixed top-4 right-4 z-50 w-96 bg-white shadow-lg"
+          });
+          return;
+        }
+
+        // ตรวจสอบผลลัพธ์จาก stored procedure
+        if (!result.success) {
+          toast({
+            variant: "destructive",
+            title: language === 'th' ? "ไม่สามารถเพิ่มสิทธิ์ได้" : "Cannot Create Access",
+            description: language === 'th'
+              ? "คุณมีสิทธิ์การใช้งานอยู่แล้ว"
+              : "You already have access to this course"
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        // อัพเดทสถานะและปิด modal
+        if (onSelectPackage) {
+          onSelectPackage(selectedPackage.id);
+        }
+        onClose();
+
+        // แสดง toast success
+        toast({
+          title: language === 'th' ? "เพิ่มสิทธิ์สำเร็จ" : "Access Created Successfully",
+          description: language === 'th'
+            ? `คุณสามารถใช้งานได้ ${formatDuration(selectedPackage.duration_days)} (${selectedPackage.daily_limit} ครั้ง/วัน)`
+            : `You can use this tool for ${formatDuration(selectedPackage.duration_days)} (${selectedPackage.daily_limit} times/day)`,
+          className: "fixed top-4 right-4 z-50 w-96 bg-white shadow-lg"
+        });
+
+        // รีเฟรชหน้าหลังจาก 1 วินาที
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        // ถ้าไม่ใช่แพ็คเกจฟรี แสดง PaymentModal
+        setSelectedPackage(selectedPackage);
+        setShowPayment(true);
+      }
+    } catch (error) {
+      console.error('Error in handleSelectPackage:', error);
       toast({
         variant: "destructive",
-        title: language === 'th' 
-          ? 'กรุณาเข้าสู่ระบบก่อนซื้อแพ็คเกจ'
-          : 'Please login to purchase package'
+        title: language === 'th' ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === 'th' 
+          ? "ไม่สามารถเพิ่มสิทธิ์ได้ กรุณาลองใหม่อีกครั้ง"
+          : "Cannot create access. Please try again.",
+        className: "fixed top-4 right-4 z-50 w-96 bg-white shadow-lg"
       });
-      return;
-    }
-
-    setSelectedPackage(pkg);
-    if (pkg.is_free) {
-      // ถ้าเป็นแพ็คเกจฟรี ให้เรียก onSelectPackage ทันที
-      onSelectPackage?.(pkg.id);
-      onClose();
-    } else {
-      // ถ้าเป็นแพ็คเกจเสียเงิน ให้เปิด PaymentModal
-      setShowPayment(true);
+    } finally {
+      setIsProcessing(false);
     }
   };
 

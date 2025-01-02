@@ -1,206 +1,287 @@
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prismaClient } from '@/lib/prisma';
 import { CoinTransactionType, CoinTransactionReason, CoinTransactionStatus } from '@prisma/client';
-import { PrismaClient } from '@prisma/client';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: "2024-11-20.acacia",
 });
 
-const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 export async function POST(req: Request) {
-  console.log('============ WEBHOOK HANDLER START ============');
-  const body = await req.text();
-  const sig = headers().get('stripe-signature');
-
-  let event: Stripe.Event;
-
   try {
-    if (!sig || !endpointSecret) {
-      console.error('Missing signature or endpoint secret');
-      throw new Error('Missing signature or endpoint secret');
+    const body = await req.text();
+    const signature = headers().get("stripe-signature") as string;
+
+    if (!signature || !endpointSecret) {
+      return new NextResponse("Missing signature", { status: 400 });
     }
 
-    event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
-    console.log('Webhook event received:', {
-      type: event.type,
-      id: event.id,
-      object: event.data.object
-    });
+    let event: Stripe.Event;
 
-  } catch (err: any) {
-    console.error('Error verifying webhook signature:', err);
-    return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
-  }
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, endpointSecret);
+    } catch (err: any) {
+      console.error('Error verifying webhook signature:', err);
+      return new NextResponse('Webhook signature verification failed', { status: 400 });
+    }
 
-  try {
-    if (event.type === 'checkout.session.completed') {
-      const session = event.data.object as Stripe.Checkout.Session;
-      console.log('============ PAYMENT PROCESSING START ============');
-      console.log('Session data:', {
-        id: session.id,
-        metadata: session.metadata,
-        amount_total: session.amount_total,
-        payment_status: session.payment_status,
-        customer: session.customer,
-        client_reference_id: session.client_reference_id
-      });
-      
-      const userId = session.metadata?.userId;
-      const coinAmount = session.metadata?.coinAmount;
-      
-      if (!userId || !coinAmount) {
-        console.error('Missing metadata:', { 
-          userId, 
-          coinAmount, 
-          fullMetadata: session.metadata,
-          sessionId: session.id
+    // Handle the event
+    switch (event.type) {
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        console.log('Payment Intent Succeeded:', {
+          id: paymentIntent.id,
+          metadata: paymentIntent.metadata
         });
-        throw new Error(`Missing metadata: userId=${userId}, coinAmount=${coinAmount}`);
-      }
+        const metadata = paymentIntent.metadata;
 
-      try {
-        console.log('Starting database transaction...', {
-          userId,
-          coinAmount,
-          sessionId: session.id
-        });
-        
-        const result = await prisma.$transaction(async (prisma) => {
-          console.log('Checking for existing transaction...');
-          const existingTransaction = await prisma.transaction.findFirst({
-            where: {
-              userId: userId,
-              amount: parseInt(coinAmount),
-              type: 'payment',
-              status: 'completed',
-              createdAt: {
-                gte: new Date(Date.now() - 5 * 60 * 1000)
-              }
+        if (metadata?.userId) {
+          try {
+            // ตรวจสอบว่ามี user อยู่แล้วหรือไม่
+            const user = await prismaClient.user.findUnique({
+              where: { clerkId: metadata.userId }
+            });
+
+            // ถ้าไม่มี user ให้สร้างใหม่
+            if (!user) {
+              const user = await prismaClient.user.create({
+                data: {
+                  clerkId: metadata.userId,
+                  coins: 0
+                }
+              });
             }
-          });
 
-          if (existingTransaction) {
-            console.log('Transaction already processed:', existingTransaction);
-            return { transactionRecord: existingTransaction, user: null, coinTransaction: null };
-          }
-
-          // ตรวจสอบและเตรียมข้อมูลสำหรับ Transaction
-          const paymentIntent = session.payment_intent 
-            ? (typeof session.payment_intent === 'string' 
-              ? session.payment_intent 
-              : session.payment_intent.id)
-            : null;
-
-          console.log('Creating transaction record...', {
-            userId,
-            amount: parseInt(coinAmount),
-            paymentIntent,
-            sessionId: session.id
-          });
-
-          const transactionRecord = await prisma.transaction.create({
-            data: {
-              userId: userId,
-              amount: parseInt(coinAmount),
-              type: 'payment',
-              status: 'completed',
-              stripePaymentId: paymentIntent,
-              error: null // ระบุชัดเจนว่าไม่มี error
+            // สร้าง Transaction record
+            if (!user) {
+              throw new Error('User not found');
             }
-          });
-          console.log('Transaction record created:', transactionRecord);
-
-          console.log('Finding or creating user...');
-          let user = await prisma.user.findUnique({
-            where: { id: userId }
-          });
-          
-          if (!user) {
-            console.log('Creating new user...');
-            user = await prisma.user.create({
+            await prismaClient.transaction.create({
               data: {
-                id: userId,
-                coins: parseInt(coinAmount)
+                userId: user.id,
+                amount: paymentIntent.amount / 100, // ตอนนี้ TypeScript รู้ว่า user ไม่ใช่ null แล้ว
+                status: 'completed',
+                stripePaymentId: paymentIntent.id
               }
             });
-          } else {
-            console.log('Updating existing user...');
+
+            // Update user's coins balance
+            const updatedUser = await prismaClient.user.update({
+              where: { clerkId: metadata.userId },
+              data: {
+                coins: {
+                  increment: metadata.coins ? parseInt(metadata.coins) : 0
+                }
+              }
+            });
+
+            // สร้าง CoinTransaction record
+            await prismaClient.coinTransaction.create({
+              data: {
+                userId: updatedUser.id,
+                amount: metadata.coins ? parseInt(metadata.coins) : 0,
+                type: CoinTransactionType.CREDIT,
+                reason: CoinTransactionReason.PURCHASE,
+                status: CoinTransactionStatus.COMPLETED,
+                balance: updatedUser.coins
+              }
+            });
+          } catch (error) {
+            console.error('Error processing payment intent success:', error);
+          }
+        }
+        break;
+      }
+
+      case 'payment_intent.payment_failed': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        const metadata = paymentIntent.metadata;
+        const error = paymentIntent.last_payment_error;
+
+        console.log('Payment Intent Failed:', {
+          id: paymentIntent.id,
+          metadata: metadata,
+          error: error
+        });
+
+        if (metadata?.userId) {
+          try {
+            // ตรวจสอบว่ามี user อยู่แล้วหรือไม่
+            let user = await prismaClient.user.findUnique({
+              where: { clerkId: metadata.userId }
+            });
+
+            if (!user) {
+              user = await prismaClient.user.create({
+                data: {
+                  clerkId: metadata.userId,
+                  coins: 0
+                }
+              });
+            }
+
+            // สร้าง Transaction record สำหรับการชำระเงินที่ล้มเหลว
+            await prismaClient.transaction.create({
+              data: {
+                userId: user.id,
+                amount: paymentIntent.amount / 100,
+                status: 'failed',
+                stripePaymentId: paymentIntent.id,
+                error: error?.message || 'Payment failed',
+                errorCode: error?.code,
+                failureMessage: error?.message
+              }
+            });
+
+            console.log('Created failed transaction record for user:', user.id);
+          } catch (error) {
+            console.error('Error processing payment intent failure:', error);
+            return new NextResponse('Error processing webhook', { status: 500 });
+          }
+        }
+        break;
+      }
+
+      case 'payment_intent.created': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        console.log('Payment Intent Created:', {
+          id: paymentIntent.id,
+          metadata: paymentIntent.metadata
+        });
+        break;
+      }
+
+      case 'charge.failed': {
+        const charge = event.data.object as Stripe.Charge;
+        const paymentIntentId = charge.payment_intent as string;
+        
+        if (paymentIntentId) {
+          try {
+            // อัพเดท Transaction ที่มีอยู่แล้ว (ถ้ามี)
+            await prismaClient.transaction.updateMany({
+              where: {
+                stripePaymentId: paymentIntentId
+              },
+              data: {
+                status: 'failed',
+                error: charge.failure_message || 'Charge failed',
+                errorCode: charge.failure_code,
+                failureMessage: charge.failure_message
+              }
+            });
+          } catch (error) {
+            console.error('Error processing charge failure:', error);
+          }
+        }
+        break;
+      }
+
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const { userId, coinAmount } = session.metadata || {};
+
+        if (!userId || !coinAmount) {
+          console.error('Missing userId or coinAmount in session metadata');
+          return new NextResponse('Missing metadata', { status: 400 });
+        }
+
+        try {
+          const result = await prismaClient.$transaction(async (prisma) => {
+            console.log('Finding or creating user...');
+            let user = await prisma.user.findUnique({
+              where: { clerkId: userId }
+            });
+
+            if (!user) {
+              console.log('Creating new user...');
+              user = await prisma.user.create({
+                data: {
+                  clerkId: userId,
+                  coins: 0
+                }
+              });
+            }
+
+            console.log('User record:', user);
+
+            // อัพเดทจำนวนเหรียญของ user
             user = await prisma.user.update({
-              where: { id: userId },
+              where: { id: user.id },
               data: {
                 coins: {
                   increment: parseInt(coinAmount)
                 }
               }
             });
-          }
-          console.log('User record updated:', user);
 
-          console.log('Creating CoinTransaction record...');
-          const coinTransaction = await prisma.coinTransaction.create({
-            data: {
-              userId: userId,
-              amount: parseInt(coinAmount),
-              type: CoinTransactionType.CREDIT,
-              status: CoinTransactionStatus.COMPLETED,
-              reason: CoinTransactionReason.PURCHASE,
-              description: `Purchased ${coinAmount} coins via Stripe (Session: ${session.id})`,
-              balance: user.coins,
-              metadata: {
-                stripeSessionId: session.id,
-                stripePaymentIntentId: paymentIntent,
-                paymentAmount: session.amount_total,
-                customerEmail: session.customer_details?.email,
-                customerName: session.customer_details?.name,
-                paymentStatus: session.payment_status,
-                transactionId: transactionRecord.id // เก็บ reference ไว้ใน metadata
+            console.log('User record updated:', user);
+
+            console.log('Checking for existing transaction...');
+            const existingTransaction = await prisma.transaction.findFirst({
+              where: {
+                userId: user.id,
+                amount: parseInt(coinAmount),
+                status: 'completed',
+                stripePaymentId: session.payment_intent as string
               }
-            }
-          });
-          console.log('CoinTransaction record created:', coinTransaction);
+            });
 
-          return { transactionRecord, user, coinTransaction };
-        });
-        
-        console.log('Database transaction completed successfully:', result);
-        
-        return new NextResponse(JSON.stringify({ 
-          received: true,
-          session: session.id,
-          transaction: result.transactionRecord.id
-        }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-        
-      } catch (dbError: any) {
-        console.error('Database error:', {
-          message: dbError.message,
-          code: dbError.code,
-          meta: dbError.meta,
-          name: dbError.name,
-          stack: dbError.stack
-        });
-        throw new Error(`Database error: ${dbError.message}`);
+            if (existingTransaction) {
+              console.log('Transaction already exists:', existingTransaction);
+              return {
+                user,
+                transaction: existingTransaction,
+                coinTransaction: null
+              };
+            }
+
+            console.log('Creating transaction record...');
+            const transactionRecord = await prisma.transaction.create({
+              data: {
+                userId: user.id,
+                amount: parseInt(coinAmount),
+                status: 'completed',
+                stripePaymentId: session.payment_intent as string
+              }
+            });
+
+            console.log('Transaction record created:', transactionRecord);
+
+            console.log('Creating CoinTransaction record...');
+            const coinTransaction = await prisma.coinTransaction.create({
+              data: {
+                userId: user.id,
+                amount: parseInt(coinAmount),
+                type: CoinTransactionType.CREDIT,
+                reason: CoinTransactionReason.PURCHASE,
+                status: CoinTransactionStatus.COMPLETED,
+                balance: user.coins + parseInt(coinAmount)
+              }
+            });
+
+            console.log('CoinTransaction created:', coinTransaction);
+
+            return { user, transaction: transactionRecord, coinTransaction };
+          });
+
+          console.log('Transaction completed successfully:', result);
+        } catch (error) {
+          console.error('Error processing checkout session completion:', error);
+          return new NextResponse('Error processing webhook', { status: 500 });
+        }
+        break;
       }
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
     }
 
-    return new NextResponse(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error: any) {
-    console.error('Error processing webhook:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      type: event.type,
-      eventId: event.id
-    });
-    return new NextResponse(`Webhook Error: ${error.message}`, { status: 500 });
+    return new NextResponse('', { status: 200 });
+  } catch (error) {
+    console.error('Error processing webhook:', error);
+    return new NextResponse('Webhook error', { status: 500 });
   }
 }

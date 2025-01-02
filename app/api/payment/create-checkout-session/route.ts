@@ -1,81 +1,89 @@
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
-import { auth } from '@clerk/nextjs';
+import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs";
+import { prismaClient } from "@/lib/prisma";
+import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: "2024-11-20.acacia",
 });
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
     const { userId } = auth();
-    
+
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
     }
 
-    const body = await request.json();
-    const { amount, packageId, coinAmount } = body;
+    const body = await req.json();
+    const { packageId } = body;
 
-    if (!amount || isNaN(amount)) {
-      return NextResponse.json({ error: 'Amount is required' }, { status: 400 });
+    if (!packageId) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Find the package
+    const selectedPackage = await prismaClient.coinPackage.findFirst({
+      where: {
+        id: packageId,
+        active: true
+      }
+    });
+
+    if (!selectedPackage) {
+      return NextResponse.json(
+        { error: "Package not found or inactive" },
+        { status: 404 }
+      );
+    }
+
+    const coins = selectedPackage.coins;
 
     console.log('Creating checkout session with data:', {
       userId,
-      amount,
       packageId,
-      coinAmount
+      amount: selectedPackage.price,
+      coins
     });
 
-    // ดึงข้อมูลผู้ใช้จาก Clerk
-    const user = await auth();
-    const userEmail = user?.user?.emailAddresses?.[0]?.emailAddress;
-
-    const checkoutSession = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+    // Create Checkout Sessions from body params.
+    const params: Stripe.Checkout.SessionCreateParams = {
+      mode: "payment",
+      payment_method_types: ["card", "promptpay"],
       line_items: [
         {
           price_data: {
-            currency: 'thb',
+            currency: "thb",
             product_data: {
-              name: `${coinAmount} Coins Package`,
-              description: `Purchase ${coinAmount} coins for your account`,
+              name: selectedPackage.name,
             },
-            unit_amount: amount * 100, // Convert to smallest currency unit (satang)
+            unit_amount: Number(selectedPackage.price) * 100,
           },
           quantity: 1,
         },
       ],
-      mode: 'payment',
-      success_url: `${baseUrl}/dashboard/payment/success`,
-      cancel_url: `${baseUrl}/dashboard/payment`,
-      customer_email: userEmail, // ใช้อีเมลจาก Clerk
       metadata: {
-        userId: userId,
-        packageId: packageId.toString(),
-        coinAmount: coinAmount.toString(),
-        orderType: 'coin_purchase'
+        userId,
+        coinAmount: coins.toString(),
       },
-    });
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/payment?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/payment?canceled=true`,
+    };
 
-    console.log('Checkout session created:', {
-      sessionId: checkoutSession.id,
-      metadata: checkoutSession.metadata,
-      url: checkoutSession.url
-    });
+    const checkoutSession: Stripe.Checkout.Session =
+      await stripe.checkout.sessions.create(params);
 
-    if (!checkoutSession.url) {
-      throw new Error('Failed to create checkout session URL');
-    }
-
-    return NextResponse.json({ url: checkoutSession.url });
-  } catch (error: any) {
-    console.error('[PAYMENT_ERROR]', error);
+    return NextResponse.json(checkoutSession);
+  } catch (err: any) {
+    console.error("Error creating checkout session:", err);
     return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

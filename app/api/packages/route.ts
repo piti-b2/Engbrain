@@ -1,37 +1,39 @@
-import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { NextResponse } from "next/server";
+import { prismaClient } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const packages = await prisma.coinPackage.findMany({
+    // Get all active packages ordered by price
+    const packages = await prismaClient.coinPackage.findMany({
       where: {
-        is_active: true
+        active: true
       },
       orderBy: {
         price: 'asc'
       }
     });
 
-    // Transform data to match frontend format
+    if (!packages || packages.length === 0) {
+      return NextResponse.json([]);
+    }
+
+    // Transform the packages to match the expected format
     const transformedPackages = packages.map(pkg => ({
       id: pkg.id,
       name: pkg.name,
-      coins: pkg.coins_amount,
-      bonus: pkg.bonus_coins,
+      coins: pkg.coins,
+      bonus: pkg.bonus,
       price: Number(pkg.price),
-      popular: pkg.is_popular,
-      tag: pkg.description || '',
+      tag: pkg.tag,
       color: pkg.color || '#FFFFFF'
     }));
 
     return NextResponse.json(transformedPackages);
+    
   } catch (error) {
-    console.error('Error fetching packages:', error);
-    return new NextResponse(JSON.stringify({ error: "Failed to fetch packages" }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(
+      { error: "Failed to fetch packages" }, 
+      { status: 500 }
+    );
   }
 }

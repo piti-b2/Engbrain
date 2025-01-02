@@ -9,6 +9,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser } from "@clerk/nextjs";
 import { v4 as uuidv4 } from 'uuid';
+import { useRouter } from 'next/navigation';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface PaymentModalProps {
     name_en: string;
     price: number;
     duration_days: number;
+    daily_limit: number;
   };
   courseId: string;
   onSuccess?: () => void;
@@ -35,186 +37,215 @@ export default function PaymentModal({
   const { user } = useUser();
   const [isProcessing, setIsProcessing] = useState(false);
   const [userCoins, setUserCoins] = useState<number>(0);
+  const [userId, setUserId] = useState<string>('');
   const supabase = createClientComponentClient();
   const { toast } = useToast();
+  const router = useRouter();
 
+  // ตรวจสอบการเข้าถึงคอร์ส
+  const checkExistingAccess = async () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: language === 'th' ? "ไม่สามารถดำเนินการได้" : "Cannot Process",
+        description: language === 'th'
+          ? "กรุณาเข้าสู่ระบบก่อนดำเนินการ"
+          : "Please login before proceeding"
+      });
+      return true;
+    }
+
+    try {
+      const { data: accessData } = await supabase
+        .from('course_access')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', courseId)
+        .eq('access_type', 'PREMIUM')
+        .eq('status', 'ACTIVE')
+        .maybeSingle();
+
+      return !!accessData;
+    } catch (error) {
+      console.error('Error checking access:', error);
+      return false;
+    }
+  };
+
+  // เช็คข้อมูลผู้ใช้เมื่อ modal เปิด
   useEffect(() => {
-    const fetchUserCoins = async () => {
-      if (!user) return;
-      
-      const { data: userData, error } = await supabase
-        .from('User')  // ใช้ตาราง User (ตัวใหญ่)
-        .select('coins')
-        .eq('id', user.id)
-        .single();
-      
-      if (error) {
+    const fetchUserData = async () => {
+      if (!user) {
         toast({
           variant: "destructive",
-          title: language === 'th' 
-            ? 'ไม่สามารถโหลดข้อมูลเหรียญได้'
-            : 'Could not load coin balance',
+          title: language === 'th' ? "ไม่สามารถดำเนินการได้" : "Cannot Process",
+          description: language === 'th'
+            ? "กรุณาเข้าสู่ระบบก่อนดำเนินการ"
+            : "Please login before proceeding"
         });
+        onClose();
         return;
       }
 
-      if (userData) {
-        setUserCoins(userData.coins);
+      try {
+        const { data: userData, error } = await supabase
+          .from('User')
+          .select('id, coins')
+          .eq('clerkId', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (userData) {
+          setUserId(userData.id);
+          setUserCoins(userData.coins);
+        } else {
+          // สร้างผู้ใช้ใหม่ถ้ายังไม่มีข้อมูล
+          const { data: newUser, error: createError } = await supabase
+            .from('User')
+            .insert([{
+              clerkId: user.id,
+              coins: 0
+            }])
+            .select()
+            .single();
+
+          if (createError) throw createError;
+
+          if (newUser) {
+            setUserId(newUser.id);
+            setUserCoins(0);
+          }
+        }
+
+        // เช็คว่ามีสิทธิ์อยู่แล้วหรือไม่
+        const hasAccess = await checkExistingAccess();
+        if (hasAccess) {
+          toast({
+            variant: "destructive",
+            title: language === 'th' ? "ไม่สามารถซื้อได้" : "Cannot Purchase",
+            description: language === 'th'
+              ? "คุณมีสิทธิ์การใช้งานอยู่แล้ว"
+              : "You already have access to this course"
+          });
+          onClose();
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        toast({
+          variant: "destructive",
+          title: language === 'th' ? "เกิดข้อผิดพลาด" : "Error",
+          description: language === 'th'
+            ? "ไม่สามารถดึงข้อมูลผู้ใช้ได้"
+            : "Cannot fetch user data"
+        });
+        onClose();
       }
     };
 
     if (isOpen) {
-      fetchUserCoins();
+      fetchUserData();
     }
-  }, [isOpen, user, supabase, language]);
+  }, [isOpen, user, supabase, courseId, language, onClose]);
 
   const handlePayment = async () => {
-    if (!user) return;
-    
-    // ตรวจสอบเหรียญไม่พอก่อนทำรายการ
-    if (userCoins < packageData.price) {
+    if (!user || !userId) {
       toast({
         variant: "destructive",
-        title: language === 'th' 
-          ? 'เหรียญไม่พอ'
-          : 'Insufficient coins',
+        title: language === 'th' ? "ไม่สามารถดำเนินการได้" : "Cannot Process",
         description: language === 'th'
-          ? `คุณมี ${userCoins} เหรียญ แต่ต้องใช้ ${packageData.price} เหรียญ`
-          : `You have ${userCoins} coins but need ${packageData.price} coins`
+          ? "กรุณาเข้าสู่ระบบก่อนดำเนินการ"
+          : "Please login before proceeding"
       });
       return;
     }
-    
-    setIsProcessing(true);
+
     try {
-      // อัพเดทเหรียญใน User ก่อน
-      const { error: updateError } = await supabase
-        .from('User')
-        .update({ coins: userCoins - packageData.price })
-        .eq('id', user.id);
+      setIsProcessing(true);
 
-      if (updateError) throw updateError;
-
-      // เช็คว่ามี course access อยู่แล้วหรือไม่
-      const { data: existingAccess, error: queryError } = await supabase
-        .from('course_access')
-        .select('id, expiry_date')
-        .eq('user_id', String(user.id))  
-        .eq('course_id', String(courseId))  
-        .eq('status', 'ACTIVE')
-        .maybeSingle();
-
-      console.log('Checking existing access:', { existingAccess, queryError });
-
-      if (queryError) {
-        console.error('Query error:', queryError);
-        throw queryError;
-      }
-
-      // คำนวณวันหมดอายุ
-      let newExpiryDate = new Date();
-      if (existingAccess?.expiry_date) {
-        const currentExpiry = new Date(existingAccess.expiry_date);
-        if (currentExpiry > newExpiryDate) {
-          newExpiryDate = currentExpiry;
-        }
-      }
-      newExpiryDate.setDate(newExpiryDate.getDate() + packageData.duration_days);
-
-      console.log('New expiry date:', newExpiryDate);
-
-      let accessError;
-      const accessData = {
-        user_id: String(user.id),
-        course_id: String(courseId),
-        purchase_date: new Date().toISOString(),
-        expiry_date: newExpiryDate.toISOString(),
-        access_type: 'PURCHASED',
-        status: 'ACTIVE',
-        created_at: new Date().toISOString()
-      };
-
-      console.log('Access data to insert:', accessData);
-
-      if (existingAccess) {
-        // ถ้ามีข้อมูลอยู่แล้ว ให้ update
-        const { error } = await supabase
-          .from('course_access')
-          .update({
-            purchase_date: new Date().toISOString(),
-            expiry_date: newExpiryDate.toISOString()
-          })
-          .eq('id', existingAccess.id);
-        accessError = error;
-        if (error) console.error('Update error:', error);
-      } else {
-        // ถ้าไม่มีข้อมูล ให้ insert ใหม่
-        const { error } = await supabase
-          .from('course_access')
-          .insert(accessData);
-        accessError = error;
-        if (error) console.error('Insert error:', error);
-      }
-
-      if (accessError) throw accessError;
-
-      // ดึงข้อมูลคอร์ส
-      const { data: courseData, error: courseError } = await supabase
-        .from('courses')
-        .select('title_th, title_en')
-        .eq('id', courseId)
-        .single();
-
-      if (courseError) throw new Error('Course not found');
-      if (!courseData) throw new Error('Course not found');
-
-      // สร้าง description ที่มีทั้งชื่อคอร์สและแพ็คเกจ
-      const transactionDescription = language === 'th'
-        ? `ซื้อคอร์ส: ${courseData.title_th} - แพ็คเกจ: ${packageData.name_th} (${packageData.duration_days} วัน)`
-        : `Purchase course: ${courseData.title_en} - Package: ${packageData.name_en} (${packageData.duration_days} days)`;
-
-      console.log('Transaction description:', transactionDescription);
-
-      // บันทึก transaction หลังจากทำรายการสำเร็จ
-      const now = new Date().toISOString();  // ใช้เวลาเดียวกันทั้ง createdAt และ updatedAt
-      const { error: transactionError } = await supabase
-        .from('CoinTransaction')
-        .insert({
-          id: uuidv4(),
-          userId: user.id,
-          amount: -packageData.price,
-          balance: userCoins - packageData.price,
-          type: 'DEBIT',
-          reason: 'PURCHASE',
-          description: transactionDescription,
-          status: 'COMPLETED',
-          createdAt: now,
-          updatedAt: now  // เพิ่ม updatedAt
+      // ตรวจสอบว่ามีเหรียญเพียงพอ
+      if (userCoins < packageData.price) {
+        toast({
+          variant: "destructive",
+          title: language === 'th' ? "เหรียญไม่เพียงพอ" : "Insufficient Coins",
+          description: language === 'th'
+            ? "กรุณาเติมเหรียญก่อนดำเนินการต่อ"
+            : "Please top up your coins before proceeding"
         });
+        return;
+      }
+
+      // ตรวจสอบว่ามีสิทธิ์อยู่แล้วหรือไม่
+      const hasAccess = await checkExistingAccess();
+      if (hasAccess) {
+        toast({
+          variant: "destructive",
+          title: language === 'th' ? "ไม่สามารถซื้อได้" : "Cannot Purchase",
+          description: language === 'th'
+            ? "คุณมีสิทธิ์การใช้งานอยู่แล้ว"
+            : "You already have access to this course"
+        });
+        return;
+      }
+
+      // สร้าง transaction ID
+      const transactionId = uuidv4();
+
+      // เริ่มการทำธุรกรรม
+      const { error: transactionError } = await supabase.rpc('process_course_purchase', {
+        p_user_id: userId,
+        p_course_id: courseId,
+        p_package_id: packageData.id,
+        p_transaction_id: transactionId,
+        p_amount: packageData.price,
+        p_duration_days: packageData.duration_days,
+        p_daily_limit: packageData.daily_limit
+      });
 
       if (transactionError) {
         console.error('Transaction error:', transactionError);
-        throw transactionError;
+        toast({
+          variant: "destructive",
+          title: language === 'th' ? "เกิดข้อผิดพลาด" : "Transaction Failed",
+          description: language === 'th'
+            ? "ไม่สามารถดำเนินการซื้อได้ กรุณาลองใหม่อีกครั้ง"
+            : "Cannot process the purchase. Please try again."
+        });
+        return;
       }
 
+      // อัพเดทจำนวนเหรียญในหน้าจอ
+      setUserCoins(prev => prev - packageData.price);
+
+      // แสดง toast success
       toast({
-        title: language === 'th' 
-          ? 'ชำระเงินสำเร็จ!' 
-          : 'Payment successful!',
+        title: language === 'th' ? "ซื้อสำเร็จ" : "Purchase Successful",
         description: language === 'th'
-          ? 'คุณสามารถเข้าเรียนได้ทันที'
-          : 'You can start learning now'
+          ? `คุณสามารถใช้งานได้ ${packageData.duration_days} วัน (${packageData.daily_limit} ครั้ง/วัน)`
+          : `You can use this course for ${packageData.duration_days} days (${packageData.daily_limit} times/day)`
       });
-      onSuccess?.();
+
+      // เรียก callback onSuccess ถ้ามี
+      if (onSuccess) {
+        onSuccess();
+      }
+
+      // ปิด modal
       onClose();
-      
-    } catch (error: any) {
+
+      // รีเฟรชหน้าหลังจาก 1 วินาที
+      setTimeout(() => {
+        router.refresh();
+      }, 1000);
+
+    } catch (error) {
+      console.error('Payment error:', error);
       toast({
         variant: "destructive",
-        title: language === 'th'
-          ? 'เกิดข้อผิดพลาด'
-          : 'Error',
-        description: error.message || (language === 'th' ? 'เหรียญไม่เพียงพอ' : 'Insufficient coins')
+        title: language === 'th' ? "เกิดข้อผิดพลาด" : "Error",
+        description: language === 'th'
+          ? "ไม่สามารถดำเนินการชำระเงินได้"
+          : "Cannot process the payment"
       });
     } finally {
       setIsProcessing(false);
@@ -225,47 +256,69 @@ export default function PaymentModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl font-semibold">
             {language === 'th' ? 'ยืนยันการชำระเงิน' : 'Confirm Payment'}
           </DialogTitle>
-          <DialogDescription>
-            {language === 'th' 
-              ? 'กรุณาตรวจสอบรายละเอียดการชำระเงินของคุณ' 
-              : 'Please review your payment details'}
-          </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          <div className="text-center space-y-2">
-            <h3 className="font-semibold text-lg">
-              {language === 'th' ? packageData.name_th : packageData.name_en}
-            </h3>
-            <p className="text-sm text-gray-500">
-              {language === 'th' 
-                ? `${Math.ceil(packageData.duration_days / 30)} เดือน` 
-                : `${Math.ceil(packageData.duration_days / 30)} months`}
-            </p>
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-sm text-gray-500">
-                {language === 'th' ? 'เหรียญของคุณ:' : 'Your coins:'} 
-                <span className="font-semibold"> {userCoins.toLocaleString()}</span>
-              </p>
-              <p className="text-xl font-bold text-primary">
-                {packageData.price.toLocaleString()} {language === 'th' ? 'เหรียญ' : 'coins'}
-              </p>
-              {userCoins < packageData.price && (
-                <p className="text-sm text-red-500">
-                  {language === 'th' 
-                    ? 'เหรียญไม่เพียงพอ กรุณาเติมเหรียญ' 
-                    : 'Insufficient coins. Please top up.'}
-                </p>
-              )}
+
+        <div className="flex flex-col space-y-6 p-4">
+          {/* Package Title */}
+          <div className="text-center space-y-1">
+            <div className="text-xl font-medium">
+              <span className="mr-2">🎁</span>
+              {language === 'th' ? 'แพ็คเกจพื้นฐาน 30 วัน' : 'Basic Package 30 Days'}
             </div>
           </div>
 
-          <div className="flex justify-center gap-3">
-            <Button
-              variant="outline"
+          {/* Price Details */}
+          <div className="space-y-2 font-mono">
+            {/* Package Price */}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">
+                {language === 'th' ? 'ราคาแพ็คเกจ' : 'Package Price'}
+              </span>
+              <span className="font-medium">
+                {packageData.price.toLocaleString()} 🪙
+              </span>
+            </div>
+
+            {/* Current Coins */}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">
+                {language === 'th' ? 'เหรียญของคุณ' : 'Your Coins'}
+              </span>
+              <span className="font-medium">
+                {userCoins.toLocaleString()} 🪙
+              </span>
+            </div>
+
+            {/* Divider Line */}
+            <div className="border-t border-gray-200 my-2"></div>
+
+            {/* Remaining Coins */}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600">
+                {language === 'th' ? 'คงเหลือ' : 'Remaining'}
+              </span>
+              <span className="font-medium">
+                {(userCoins - packageData.price).toLocaleString()} 🪙
+              </span>
+            </div>
+          </div>
+
+          {/* Insufficient Coins Warning */}
+          {userCoins < packageData.price && (
+            <div className="text-red-500 text-sm text-center">
+              {language === 'th' 
+                ? 'เหรียญไม่เพียงพอ กรุณาเติมเหรียญ'
+                : 'Insufficient coins. Please top up.'}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-4 mt-4">
+            <Button 
+              variant="outline" 
               onClick={onClose}
               disabled={isProcessing}
             >
@@ -274,6 +327,7 @@ export default function PaymentModal({
             <Button
               onClick={handlePayment}
               disabled={isProcessing || userCoins < packageData.price}
+              className="bg-black text-white hover:bg-gray-800"
             >
               {isProcessing ? (
                 <>

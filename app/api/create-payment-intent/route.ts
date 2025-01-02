@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       where: {
         id: packageId,
         price: amount,
-        is_active: true
+        active: true
       }
     });
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const coinsAmount = selectedPackage.coins_amount;
+    const coinsAmount = selectedPackage.coins;
 
     console.log('Creating checkout session with data:', {
       userId,

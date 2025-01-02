@@ -72,6 +72,33 @@ export const translations = {
       },
       balance: {
         title: 'ยอดเหรียญคงเหลือ'
+      },
+      package: {
+        receive: 'ได้รับ',
+        bonus: 'โบนัส',
+        averagePrice: 'ราคาเฉลี่ย',
+        per: 'ต่อ',
+        coin: 'เหรียญ',
+        names: {
+          'Starter Pack': 'แพ็คเริ่มต้น',
+          'Basic Pack': 'แพ็คพื้นฐาน',
+          'Bronze Pack': 'แพ็คบรอนซ์',
+          'Silver Pack': 'แพ็คซิลเวอร์',
+          'Gold Pack': 'แพ็คโกลด์',
+          'Platinum Pack': 'แพ็คแพลตินัม',
+          'Diamond Pack': 'แพ็คไดมอนด์',
+          'Ultimate Pack': 'แพ็คอัลติเมท'
+        },
+        tags: {
+          'Start Here': 'เริ่มต้น',
+          'Basic': 'พื้นฐาน',
+          'Popular': 'ยอดนิยม',
+          'Great Deal': 'ดีลพิเศษ',
+          'Best Seller': 'ขายดีที่สุด',
+          'Platinum': 'แพลตินัม',
+          'Diamond': 'ไดมอนด์',
+          'Ultimate': 'อัลติเมท'
+        }
       }
     },
     startingFrom: 'เริ่มต้น',
@@ -151,6 +178,33 @@ export const translations = {
       },
       balance: {
         title: 'Current Balance'
+      },
+      package: {
+        receive: 'Receive',
+        bonus: 'Bonus',
+        averagePrice: 'Average Price',
+        per: 'per',
+        coin: 'coin',
+        names: {
+          'Starter Pack': 'Starter Pack',
+          'Basic Pack': 'Basic Pack',
+          'Bronze Pack': 'Bronze Pack',
+          'Silver Pack': 'Silver Pack',
+          'Gold Pack': 'Gold Pack',
+          'Platinum Pack': 'Platinum Pack',
+          'Diamond Pack': 'Diamond Pack',
+          'Ultimate Pack': 'Ultimate Pack'
+        },
+        tags: {
+          'Start Here': 'Start Here',
+          'Basic': 'Basic',
+          'Popular': 'Popular',
+          'Great Deal': 'Great Deal',
+          'Best Seller': 'Best Seller',
+          'Platinum': 'Platinum',
+          'Diamond': 'Diamond',
+          'Ultimate': 'Ultimate'
+        }
       }
     },
     startingFrom: 'Starting from',

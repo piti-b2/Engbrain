@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prismaClient } from '@/lib/prisma';
 import { CoinTransactionType, CoinTransactionReason, CoinTransactionStatus } from '@prisma/client';
 
 export class CoinTransactionService {
@@ -10,7 +10,7 @@ export class CoinTransactionService {
     description?: string,
     metadata?: any
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prismaClient.$transaction(async (tx) => {
       // ดึงข้อมูลผู้ใช้
       const user = await tx.user.findUnique({
         where: { id: userId },
@@ -53,7 +53,7 @@ export class CoinTransactionService {
     description?: string,
     metadata?: any
   ) {
-    return await prisma.$transaction(async (tx) => {
+    return await prismaClient.$transaction(async (tx) => {
       // ดึงข้อมูลผู้ใช้
       const user = await tx.user.findUnique({
         where: { id: userId },
@@ -91,23 +91,58 @@ export class CoinTransactionService {
 
   // ดึงประวัติธุรกรรม
   static async getTransactionHistory(
-    userId: string,
+    clerkId: string,
     page: number = 1,
     limit: number = 10
   ) {
     const skip = (page - 1) * limit;
 
+    console.log('Finding user with clerkId:', clerkId);
+    // หา userId จากตาราง User ก่อน
+    const user = await prismaClient.user.findUnique({
+      where: { clerkId }
+    });
+
+    console.log('Found user:', user);
+
+    if (!user) {
+      console.log('User not found');
+      return {
+        transactions: [],
+        pagination: {
+          total: 0,
+          page,
+          limit,
+          totalPages: 0
+        }
+      };
+    }
+
+    console.log('Finding transactions for userId:', user.id);
     const [transactions, total] = await Promise.all([
-      prisma.coinTransaction.findMany({
-        where: { userId },
+      prismaClient.coinTransaction.findMany({
+        where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
         skip,
-        take: limit
+        take: limit,
+        select: {
+          id: true,
+          amount: true,
+          type: true,
+          reason: true,
+          description: true,
+          status: true,
+          createdAt: true,
+          balance: true
+        }
       }),
-      prisma.coinTransaction.count({
-        where: { userId }
+      prismaClient.coinTransaction.count({
+        where: { userId: user.id }
       })
     ]);
+
+    console.log('Found transactions:', transactions);
+    console.log('Total transactions:', total);
 
     return {
       transactions,

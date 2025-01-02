@@ -9,6 +9,9 @@ import { Card } from "@/components/ui/card";
 import { Search, Volume2, BookA } from "lucide-react";
 import Image from 'next/image';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { useAuth } from "@clerk/nextjs";  
+import { useToast } from "@/components/ui/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 // เพิ่ม interface
 interface PhonicsSound {
@@ -40,6 +43,15 @@ interface SearchResult {
   pattern?: string;
 }
 
+interface PhonicsResult {
+  phonics: string;
+  thai_meaning?: string;
+  part_of_speech?: string;
+  sample_sentence?: string;
+  word_group?: string;
+  pattern?: string;
+}
+
 // เพิ่มฟังก์ชัน searchWord
 const searchWord = async (term: string) => {
   try {
@@ -66,10 +78,193 @@ const isSightWord = (wordGroup: string | undefined): boolean => {
 
 export default function PhonicsDictionaryPage() {
   const { language } = useLanguage();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasAccess, setHasAccess] = useState(false);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+  const [currentAccessId, setCurrentAccessId] = useState<number | null>(null);
+  const [remainingUsage, setRemainingUsage] = useState<number | null>(null);
+  const supabase = createClientComponentClient();
+  const { userId } = useAuth();  
+
+  // เพิ่มฟังก์ชันตรวจสอบการใช้งานรายวัน
+  const checkDailyUsage = async () => {
+    if (!currentAccessId) return false;
+
+    try {
+      // เรียกใช้ stored procedure แทนการอัพเดตโดยตรง
+      const { data, error } = await supabase
+        .rpc('update_daily_usage', {
+          p_access_id: currentAccessId
+        });
+
+      if (error) {
+        console.error('Error checking daily usage:', error);
+        return false;
+      }
+
+      console.log('Daily usage check result:', data);
+
+      return data.success;
+    } catch (error) {
+      console.error('Error in checkDailyUsage:', error);
+      return false;
+    }
+  };
+
+  // เพิ่มฟังก์ชันดึงจำนวนครั้งที่เหลือ
+  const fetchRemainingUsage = async () => {
+    if (!currentAccessId) return;
+
+    try {
+      const { data: access, error } = await supabase
+        .from('course_access')
+        .select('daily_limit, usage_count, is_free')
+        .eq('id', currentAccessId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching remaining usage:', error);
+        return;
+      }
+
+      if (access && access.is_free) {
+        const remaining = access.daily_limit - (access.usage_count || 0);
+        setRemainingUsage(Math.max(0, remaining));
+      } else {
+        setRemainingUsage(null);
+      }
+    } catch (error) {
+      console.error('Error in fetchRemainingUsage:', error);
+    }
+  };
+
+  // ตรวจสอบสิทธิ์เมื่อโหลดหน้า
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        console.log('Checking access with userId:', userId);
+
+        if (!userId) {
+          console.log('No Clerk user found');
+          return;
+        }
+
+        // ดึง user id จากตาราง User
+        const { data: userData, error: userError } = await supabase
+          .from('User')
+          .select('id')
+          .eq('clerkId', userId)  
+          .single();
+
+        console.log('User query result:', { userData, userError });
+
+        if (userError || !userData) {
+          console.error('Error getting user:', userError);
+          console.log('User data from DB:', userData);
+          return;
+        }
+
+        // ตรวจสอบสิทธิ์การเข้าถึง
+        const { data: access, error: accessError } = await supabase
+          .from('course_access')
+          .select('*')
+          .eq('user_id', userData.id)
+          .eq('course_id', 'course_004')
+          .eq('status', 'ACTIVE')
+          .order('expiry_date', { ascending: false })
+          .limit(1);
+
+        console.log('Access check result:', {
+          access,
+          accessError,
+          userId: userData.id,
+          courseId: 'course_004'
+        });
+
+        if (accessError) {
+          console.error('Error checking access:', accessError);
+          return;
+        }
+
+        if (!access || access.length === 0) {
+          console.log('No active access found');
+          console.log('Access data:', access);
+          return;
+        }
+
+        const validAccess = access[0];
+        const expiryDate = new Date(validAccess.expiry_date);
+        const now = new Date();
+
+        console.log('Access details:', {
+          validAccess,
+          expiryDate,
+          now,
+          isValid: expiryDate > now,
+          timeDiff: expiryDate.getTime() - now.getTime()
+        });
+
+        if (expiryDate <= now) {
+          console.log('Access expired');
+          return;
+        }
+
+        console.log('Access granted:', validAccess);
+        setHasAccess(true);
+        setCurrentAccessId(validAccess.id);
+      } catch (error) {
+        console.error('Error in checkAccess:', error);
+      } finally {
+        setIsCheckingAccess(false);
+      }
+    };
+
+    if (userId) {  
+      checkAccess();
+    }
+  }, [userId]);  
+
+  // เรียกใช้ตอนโหลดหน้าและหลังการค้นหา
+  useEffect(() => {
+    if (hasAccess) {
+      fetchRemainingUsage();
+    }
+  }, [hasAccess, currentAccessId]);
+
+  // แสดง loading ขณะตรวจสอบสิทธิ์
+  if (isCheckingAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  // ถ้าไม่มีสิทธิ์ แสดงข้อความแทนการ redirect
+  if (!hasAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 className="text-2xl font-bold mb-4">
+          {language === 'th' ? 'ไม่มีสิทธิ์เข้าถึง' : 'Access Denied'}
+        </h1>
+        <p className="text-gray-600 text-center mb-4">
+          {language === 'th' 
+            ? 'คุณไม่มีสิทธิ์เข้าถึงเครื่องมือนี้ กรุณาซื้อแพ็คเกจก่อนใช้งาน'
+            : 'You do not have access to this tool. Please purchase a package to continue.'}
+        </p>
+        <Button
+          onClick={() => window.location.href = '/dashboard/tools'}
+          className="bg-blue-500 text-white"
+        >
+          {language === 'th' ? 'กลับไปหน้าเครื่องมือ' : 'Back to Tools'}
+        </Button>
+      </div>
+    );
+  }
 
   // ฐานข้อมูลรูปปากสำหรับเสียงต่างๆ จาก Supabase Storage
   const BUCKET_NAME = 'engbrainstorage';
@@ -210,47 +405,36 @@ export default function PhonicsDictionaryPage() {
 
   // ฟังก์ชันแปลงคำเป็น EngBrain Phonics
   const getEngBrainPhonics = async (word: string): Promise<{
-    results: Array<{
-      phonics: string;
-      thai_meaning?: string;
-      part_of_speech?: string;
-      sample_sentence?: string;
-      word_group?: string;
-    }>;
+    results: PhonicsResult[];
     soundUrls?: {
       default?: string;
       us?: string;
       uk?: string;
     };
   }> => {
+    const supabase = createClientComponentClient();
+    
     try {
-      console.log('DEBUG: Starting getEngBrainPhonics for word:', word);
-      
-      // ค้นหาใน phonics_words เท่านั้น
-      const supabase = createClientComponentClient();
       const { data, error } = await supabase
         .from('phonics_words')
         .select('*')
-        .ilike('word', word);
+        .eq('word', word.toLowerCase());
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('Supabase error:', error);
+        return { results: [] };
       }
 
-      console.log('DEBUG: Database results:', data);
-
-      // ส่งคืนข้อมูลทั้งหมดที่พบ
       return {
         results: data || [],
-        soundUrls: undefined
+        soundUrls: {
+          us: '',
+          uk: ''
+        }
       };
-
     } catch (error) {
       console.error('Error in getEngBrainPhonics:', error);
-      return {
-        results: [],
-        soundUrls: undefined
-      };
+      return { results: [] };
     }
   };
 
@@ -361,12 +545,13 @@ export default function PhonicsDictionaryPage() {
             word: word,
             phonics: '',  // Free Dictionary API doesn't provide EngBrain Phonics
             ipa: ipa,
-            soundUrls: soundUrls,
-            part_of_speech: partOfSpeech,
+            word_group: 'regular',
             thai_meaning: definition, // ใช้ความหมายภาษาอังกฤษไปก่อน
+            part_of_speech: partOfSpeech,
             sample_sentence: example,
             pattern: 'CVC',  // เพิ่ม pattern
-            word_group: 'regular'
+            soundUrls: soundUrls,
+            isTricky: false
           };
         }
       } catch (error) {
@@ -383,7 +568,8 @@ export default function PhonicsDictionaryPage() {
         thai_meaning: '',
         sample_sentence: '',
         pattern: 'CVC',  // เพิ่ม pattern
-        word_group: 'regular'
+        word_group: 'regular',
+        isTricky: false
       };
 
     } catch (error: any) {
@@ -397,7 +583,8 @@ export default function PhonicsDictionaryPage() {
         thai_meaning: '',
         sample_sentence: '',
         pattern: 'CVC',  // เพิ่ม pattern
-        word_group: 'regular'
+        word_group: 'regular',
+        isTricky: false
       };
     } finally {
       setIsLoading(false);
@@ -438,192 +625,120 @@ export default function PhonicsDictionaryPage() {
     }
   };
 
-  // ฟังก์ชันค้นหาคำ
-  const handleSearch = async () => {
-    if (!searchTerm) return;
+  // ฟังก์ชันค้นหาคำศัพท์
+  const handleSearch = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
     
+    if (!searchTerm?.trim()) {
+      toast({
+        title: language === 'th' ? 'กรุณากรอกคำที่ต้องการค้นหา' : 'Please enter a word to search',
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
-    
+    setSearchResults([]);
+
     try {
-      // 1. ค้นหาใน phonics_words ก่อน
-      const phonicsData = await getEngBrainPhonics(searchTerm);
-      console.log('DEBUG: Got phonics data:', phonicsData);
+      // ตรวจสอบสิทธิ์การใช้งาน
+      const { data: accessData, error: accessError } = await supabase
+        .from('course_access')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('course_id', 'phonics-dictionary')
+        .single();
 
-      // 2. ถ้าไม่พบใน phonics_words ให้ค้นหาจาก Free Dictionary API
-      if (phonicsData.results.length === 0) {
-        try {
-          // ลองใช้ Free Dictionary API ก่อน
-          const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${searchTerm}`);
-          
-          if (!response.ok) {
-            // ถ้า Free Dictionary API ไม่เจอข้อมูล ให้ลองใช้ API สำรอง
-            console.log('Free Dictionary API failed, trying backup API...');
-            const backupData = await getWordDataFromBackupAPI(searchTerm);
-            
-            if (backupData) {
-              // ถ้าได้ข้อมูลจาก API สำรอง
-              const { word, phonetic, meanings } = backupData;
-              
-              // สร้างผลลัพธ์จาก API สำรอง
-              setSearchResults([{
-                word: word,
-                phonics: '', // ไม่แสดง EngBrain Phonics
-                ipa: phonetic || '',
-                soundUrls: [],
-                isTricky: false,
-                pattern: 'CVC',  // เพิ่ม pattern
-                word_group: 'regular',
-                thai_meaning: '',
-                part_of_speech: meanings[0]?.partOfSpeech || '',
-                definitions: meanings.map((m: { definitions: { definition: string; example?: string }[] }) => ({
-                  definition: m.definitions[0].definition,
-                  example: m.definitions[0].example || ''
-                }))
-              }]);
-              
-              setIsLoading(false);
-              return;
-            }
-            
-            // ถ้าทั้งสอง API ไม่เจอข้อมูล
-            throw new Error('Word not found in both APIs');
-          }
-
-          const data = await response.json();
-          console.log('Free Dictionary API response:', data);
-          
-          // ดึง IPA และ audio URLs
-          const ipa = {
-            us: '',
-            uk: ''
-          };
-          const soundUrls = {
-            us: '',
-            uk: ''
-          };
-
-          if (data[0]?.phonetics) {
-            console.log('Phonetics data:', data[0].phonetics);
-            // รวบรวมข้อมูลจากทุก phonetics entries
-            data[0].phonetics.forEach((phonetic: any) => {
-              console.log('Processing phonetic:', phonetic);
-              if (phonetic.text) {
-                const ipaText = phonetic.text.replace(/[\/\[\]]/g, '');
-                // ถ้ามี audio ให้ใช้ audio เป็นตัวบ่งชี้ว่าเป็น US หรือ UK
-                if (phonetic.audio?.includes('-us.')) {
-                  ipa.us = ipaText;
-                  soundUrls.us = phonetic.audio;
-                } else if (phonetic.audio?.includes('-uk.')) {
-                  ipa.uk = ipaText;
-                  soundUrls.uk = phonetic.audio;
-                } else {
-                  // ถ้าไม่มี audio หรือไม่ระบุประเทศ ให้ใช้เป็น default
-                  if (!ipa.us) {
-                    ipa.us = ipaText;
-                  }
-                  if (!ipa.uk) {
-                    ipa.uk = ipaText;  // ใช้ค่าเดียวกันสำหรับ UK ถ้าไม่มีค่าเฉพาะ
-                  }
-                }
-              }
-              // ถ้ามี audio แต่ไม่มี IPA ให้เก็บ URL ไว้
-              if (phonetic.audio) {
-                if (phonetic.audio.includes('-us.')) {
-                  soundUrls.us = phonetic.audio;
-                } else if (phonetic.audio.includes('-uk.')) {
-                  soundUrls.uk = phonetic.audio;
-                }
-              }
-            });
-            console.log('Final IPA values:', ipa);
-            console.log('Final sound URLs:', soundUrls);
-          }
-          const meanings = data[0]?.meanings || [];
-          let partOfSpeech = '';
-          let definition = '';
-          let example = '';
-
-          // ดึงข้อมูลจาก meaning แรกที่มี
-          if (meanings.length > 0) {
-            partOfSpeech = meanings[0].partOfSpeech || '';
-            if (meanings[0].definitions && meanings[0].definitions.length > 0) {
-              definition = meanings[0].definitions[0].definition || '';
-              example = meanings[0].definitions[0].example || '';
-            }
-          }
-
-          // สร้างผลลัพธ์จาก Free Dictionary API
-          setSearchResults([{
-            word: searchTerm,
-            phonics: '', // ไม่แสดง EngBrain Phonics
-            ipa: ipa,
-            soundUrls: soundUrls,
-            isTricky: false,
-            pattern: 'CVC',  // เพิ่ม pattern
-            word_group: 'regular',
-            thai_meaning: definition, // ใช้ความหมายภาษาอังกฤษไปก่อน
-            part_of_speech: partOfSpeech,
-            sample_sentence: example
-          }]);
-          
-          setIsLoading(false);
-          return;
-        } catch (error) {
-          console.error('Free Dictionary API error:', error);
-        }
+      if (accessError) {
+        console.error('Error checking access:', accessError);
+        setError(language === 'th' 
+          ? 'เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์การใช้งาน' 
+          : 'Error checking access permissions');
+        return;
       }
 
-      // 3. ถ้าพบใน phonics_words ให้แสดงผลทั้งหมดที่พบ
-      const results = phonicsData.results.map(async (data) => {
-        const result = {
-          word: searchTerm,
-          phonics: data.phonics || '',
-          ipa: { us: '', uk: '' },
-          soundUrls: phonicsData.soundUrls,
-          isTricky: isTrickyWord(searchTerm),
-          pattern: getPhonicPattern(searchTerm),
-          thai_meaning: data.thai_meaning || '',
-          part_of_speech: data.part_of_speech || '',
-          sample_sentence: data.sample_sentence || '',
-          word_group: data.word_group || ''
-        };
+      if (!accessData) {
+        setError(language === 'th'
+          ? 'คุณไม่มีสิทธิ์ใช้งานพจนานุกรมโฟนิกส์ กรุณาซื้อแพ็คเกจเพื่อใช้งาน'
+          : 'You don\'t have access to Phonics Dictionary. Please purchase a package.');
+        return;
+      }
 
-        // พยายามดึง IPA จาก API
-        try {
-          const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${searchTerm}`);
-          if (response.ok) {
-            const apiData = await response.json();
-            if (apiData[0]?.phonetics) {
-              apiData[0].phonetics.forEach((phonetic: any) => {
-                if (phonetic.text) {
-                  const ipaText = phonetic.text.replace(/[\/\[\]]/g, '');
-                  if (phonetic.audio?.includes('-us.')) {
-                    result.ipa.us = ipaText;
-                  } else if (phonetic.audio?.includes('-uk.')) {
-                    result.ipa.uk = ipaText;
-                  } else {
-                    if (!result.ipa.us) result.ipa.us = ipaText;
-                    if (!result.ipa.uk) result.ipa.uk = ipaText;
-                  }
-                }
-              });
-            }
-          }
-        } catch (error) {
-          console.error('Error fetching IPA from API:', error);
-        }
+      // ตรวจสอบจำนวนครั้งที่ใช้งานต่อวัน
+      const today = new Date().toISOString().split('T')[0];
+      const { data: usageData, error: usageError } = await supabase
+        .from('feature_usage')
+        .select('count')
+        .eq('user_id', userId)
+        .eq('feature', 'phonics-dictionary')
+        .eq('date', today)
+        .single();
 
-        return result;
-      });
-
-      // รอให้ทุก result เสร็จสมบูรณ์
-      const finalResults = await Promise.all(results);
-      setSearchResults(finalResults);
+      const currentUsage = usageData?.count || 0;
       
-    } catch (error: any) {
+      if (currentUsage >= accessData.daily_limit) {
+        setError(language === 'th'
+          ? 'คุณใช้งานครบจำนวนครั้งต่อวันแล้ว กรุณารอถึงวันพรุ่งนี้หรืออัพเกรดแพ็คเกจ'
+          : 'Daily usage limit reached. Please wait until tomorrow or upgrade your package.');
+        return;
+      }
+
+      // ดึงข้อมูลจาก API
+      const phonicsData = await getEngBrainPhonics(searchTerm);
+      
+      if (!phonicsData.results || phonicsData.results.length === 0) {
+        setError(language === 'th'
+          ? 'ไม่พบข้อมูลสำหรับคำที่ค้นหา'
+          : 'No results found for the searched word');
+        return;
+      }
+
+      // อัพเดทจำนวนการใช้งาน
+      const { error: updateError } = await supabase
+        .from('feature_usage')
+        .upsert([
+          {
+            user_id: userId,
+            feature: 'phonics-dictionary',
+            date: today,
+            count: currentUsage + 1
+          }
+        ]);
+
+      if (updateError) {
+        console.error('Error updating usage:', updateError);
+      }
+
+      // อัพเดท remaining usage
+      setRemainingUsage(accessData.daily_limit - (currentUsage + 1));
+
+      // แปลงผลลัพธ์และแสดงผล
+      const results = await Promise.all(
+        phonicsData.results.map(async (data: PhonicsResult) => {
+          const result = {
+            word: searchTerm,
+            phonics: data.phonics || '',
+            ipa: { us: '', uk: '' },
+            soundUrls: phonicsData.soundUrls || { us: '', uk: '' },
+            isTricky: false,
+            pattern: data.pattern || analyzeWordPattern(searchTerm),
+            thai_meaning: data.thai_meaning || '',
+            part_of_speech: data.part_of_speech || '',
+            sample_sentence: data.sample_sentence || '',
+            word_group: data.word_group || ''
+          };
+          return result;
+        })
+      );
+
+      setSearchResults(results);
+
+    } catch (error) {
       console.error('Search error:', error);
-      setError('เกิดข้อผิดพลาดในการค้นหา');
+      setError(language === 'th'
+        ? 'เกิดข้อผิดพลาดในการค้นหา'
+        : 'An error occurred while searching');
     } finally {
       setIsLoading(false);
     }
@@ -635,6 +750,36 @@ export default function PhonicsDictionaryPage() {
     audio.play();
   };
 
+  // ฟังก์ชันวิเคราะห์รูปแบบคำ
+  const analyzeWordPattern = (word: string): string => {
+    // คำที่มี magic e
+    if (/[aeiou][^aeiou]e$/i.test(word)) {
+      return 'Magic E';
+    }
+    
+    // คำที่มีสระคู่
+    if (/[aeiou]{2}/i.test(word)) {
+      return 'Vowel Team';
+    }
+    
+    // คำที่มีรูปแบบ CVC
+    if (/^[^aeiou][aeiou][^aeiou]$/i.test(word)) {
+      return 'CVC';
+    }
+    
+    // คำที่มีรูปแบบ CCVC
+    if (/^[^aeiou]{2}[aeiou][^aeiou]$/i.test(word)) {
+      return 'CCVC';
+    }
+    
+    // คำที่มีรูปแบบ CVCC
+    if (/^[^aeiou][aeiou][^aeiou]{2}$/i.test(word)) {
+      return 'CVCC';
+    }
+    
+    return 'Other';
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-4xl">
       <h1 className="text-2xl font-bold mb-6">พจนานุกรมโฟนิกส์</h1>
@@ -643,15 +788,23 @@ export default function PhonicsDictionaryPage() {
       <div className="flex gap-2 mb-6">
         <Input
           type="text"
-          placeholder="ค้นหาคำศัพท์..."
+          placeholder={language === 'th' ? 'พิมพ์คำศัพท์ที่ต้องการค้นหา...' : 'Type a word to search...'}
+          className="flex-1"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch(e)}
         />
-        <Button onClick={handleSearch} disabled={isLoading}>
+        <Button onClick={(e) => handleSearch(e)} disabled={isLoading}>
           <Search className="w-4 h-4 mr-2" />
-          ค้นหา
+          {language === 'th' ? 'ค้นหา' : 'Search'}
         </Button>
+        {remainingUsage !== null && (
+          <p className="text-sm text-gray-600 mt-2">
+            {language === 'th' 
+              ? `เหลือการค้นหา ${remainingUsage} ครั้งในวันนี้`
+              : `${remainingUsage} searches remaining today`}
+          </p>
+        )}
       </div>
 
       {/* แสดงข้อผิดพลาด */}
@@ -817,6 +970,7 @@ export default function PhonicsDictionaryPage() {
           </Card>
         ))}
       </div>
+      <Toaster />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { UserButton, SignedIn, SignedOut, SignInButton, useUser } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 
 // Debug function
@@ -20,40 +20,11 @@ const debug = (...args: any[]) => {
   }
 };
 
-async function createOrUpdateUser(userId: string, email: string | undefined, name: string | undefined) {
-  debug('Frontend: Creating/updating user:', { userId, email, name });
-  try {
-    const response = await fetch('/api/user/profile', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        email,
-        name,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      debug('ERROR: API Error Response:', errorData);
-      throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    debug('Frontend: API Response:', data);
-    return true;
-  } catch (error) {
-    debug('ERROR: Frontend Error:', error);
-    throw error;
-  }
-}
-
-function UserProfile() {
+export default function UserProfile() {
   const { user, isLoaded, isSignedIn } = useUser();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastApiCall, setLastApiCall] = useState<string | null>(null);
 
   debug('UserProfile: Component rendered', {
     isLoaded,
@@ -107,8 +78,27 @@ function UserProfile() {
           name
         });
 
-        await createOrUpdateUser(user.id, email, name);
-        debug('UserProfile: User initialized successfully');
+        const response = await fetch('/api/user/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            email,
+            name,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          debug('ERROR: API Error Response:', errorData);
+          throw new Error(errorData?.error || `HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        debug('UserProfile: API Response:', data);
+        setLastApiCall(new Date().toISOString());
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to initialize user data';
         debug('ERROR: Failed to initialize user:', errorMessage);
@@ -121,7 +111,7 @@ function UserProfile() {
     initUser();
   }, [isLoaded, isSignedIn, user]);
 
-  // Always render status for debugging
+  // Debug panel
   return (
     <div className="fixed bottom-4 right-4 p-4 bg-white/80 rounded shadow-lg text-sm">
       <div>Status: {loading ? 'Loading...' : error ? 'Error' : 'Ready'}</div>
@@ -134,39 +124,9 @@ function UserProfile() {
         Loaded: {isLoaded ? 'Yes' : 'No'}
         <br />
         Signed In: {isSignedIn ? 'Yes' : 'No'}
+        <br />
+        Last API Call: {lastApiCall || 'Never'}
       </div>
     </div>
-  );
-}
-
-export default function Page() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24 bg-gradient-to-b from-yellow-300 via-yellow-200 to-white">
-      <div className="flex flex-col items-center gap-8 w-full max-w-md">
-        <img 
-          src="/images/logo.png" 
-          alt="Logo" 
-          className="w-64 h-64 object-contain mb-4"
-        />
-        <h1 className="text-4xl font-bold text-center">Welcome to Engbrain</h1>
-        <p className="text-xl text-gray-600 text-center">ยินดีต้อนรับสู่อิงเบรน</p>
-        
-        <SignedIn>
-          <UserProfile />
-          <UserButton afterSignOutUrl="/" />
-        </SignedIn>
-
-        <SignedOut>
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-lg">Please sign in to continue</p>
-            <SignInButton mode="modal">
-              <button className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                Sign In
-              </button>
-            </SignInButton>
-          </div>
-        </SignedOut>
-      </div>
-    </main>
   );
 }

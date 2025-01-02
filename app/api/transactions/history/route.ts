@@ -14,17 +14,17 @@ export async function GET(request: Request) {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '10');
 
-    console.log('Fetching transactions for user:', userId);
-    console.log('Page:', page, 'Limit:', limit);
+    console.log('API: Fetching transactions for clerkId:', userId);
+    console.log('API: Page:', page, 'Limit:', limit);
 
     // ดึงประวัติธุรกรรม
     const history = await CoinTransactionService.getTransactionHistory(
-      userId,
+      userId, // clerkId จาก auth()
       page,
       limit
     );
 
-    console.log('Successfully fetched transactions:', history);
+    console.log('API: Successfully fetched transactions:', history);
     return NextResponse.json(history);
   } catch (error) {
     console.error('Detailed error in transaction history:', {

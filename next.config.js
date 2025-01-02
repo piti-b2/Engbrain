@@ -40,11 +40,11 @@ const nextConfig = {
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=(), speech-synthesis=(self)'
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.clerk.accounts.dev; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' *.clerk.accounts.dev *.supabase.co api.dictionaryapi.dev api.voicerss.org wordsapiv1.p.rapidapi.com; worker-src 'self' blob:; media-src 'self' https: blob:; manifest-src 'self'"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.clerk.accounts.dev *.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' *.clerk.accounts.dev *.supabase.co *.stripe.com api.dictionaryapi.dev api.voicerss.org wordsapiv1.p.rapidapi.com; worker-src 'self' blob:; media-src 'self' https: blob:; manifest-src 'self'; frame-src 'self' *.stripe.com; report-to 'none'"
           }
         ]
       }

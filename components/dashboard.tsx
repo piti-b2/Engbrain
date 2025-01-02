@@ -24,6 +24,21 @@ export default function DashboardComponent({ children }: { children: React.React
     { id: 2, message: t.newCourseReady, isNew: true },
     { id: 3, message: t.longTimeNoStudy, isNew: false }
   ])
+  const [userCoins, setUserCoins] = useState(0)
+
+  // Fetch user's coins
+  useEffect(() => {
+    const fetchUserCoins = async () => {
+      try {
+        const response = await fetch('/api/coins/balance')
+        const data = await response.json()
+        setUserCoins(data.coins)
+      } catch (error) {
+        console.error('Error fetching user coins:', error)
+      }
+    }
+    fetchUserCoins()
+  }, [])
 
   const hasNewNotifications = notifications.some(notification => notification.isNew)
 
@@ -262,18 +277,15 @@ export default function DashboardComponent({ children }: { children: React.React
               {/* Coins */}
               <div className="flex items-center gap-1 bg-yellow-100 px-3 py-1 rounded-full border-2 border-yellow-300 shadow-sm">
                 <span className="text-lg">🪙</span>
-                <span className="font-medium text-yellow-800">1500</span>
+                <span className="font-medium text-yellow-800">{userCoins.toLocaleString('en-US', {
+                  minimumIntegerDigits: 3,
+                  useGrouping: true
+                })}</span>
                 <Link href="/dashboard/payment" className="ml-1">
                   <div className="bg-white rounded-full p-0.5">
                     <PlusCircle className="h-5 w-5 text-gray-900 hover:text-gray-600 transition-colors" />
                   </div>
                 </Link>
-              </div>
-
-              {/* Diamonds */}
-              <div className="flex items-center gap-1">
-                <span className="text-lg">💎</span>
-                <span className="font-medium text-blue-800">25</span>
               </div>
 
               {/* Notifications */}
