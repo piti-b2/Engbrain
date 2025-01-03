@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { CoinTransactionService } from '@/services/coinTransactionService';
+import { CoinTransactionService, coinTransactionService } from "../../../../services/coinTransactionService";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-11-20.acacia',
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         const coinAmount = parseInt(metadata.coinAmount);
         
         // บันทึกธุรกรรมผ่าน CoinTransactionService
-        await CoinTransactionService.addCoins(
+        await coinTransactionService.addCoins(
           userId,
           coinAmount,
           'PURCHASE',

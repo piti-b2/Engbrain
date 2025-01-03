@@ -1,9 +1,9 @@
-import { prismaClient } from '@/lib/prisma';
+import { prismaClient } from '../lib/prisma';
 import { CoinTransactionType, CoinTransactionReason, CoinTransactionStatus } from '@prisma/client';
 
 export class CoinTransactionService {
   // เพิ่มเหรียญ
-  static async addCoins(
+  async addCoins(
     userId: string,
     amount: number,
     reason: CoinTransactionReason,
@@ -46,7 +46,7 @@ export class CoinTransactionService {
   }
 
   // ลดเหรียญ
-  static async deductCoins(
+  async deductCoins(
     userId: string,
     amount: number,
     reason: CoinTransactionReason,
@@ -90,17 +90,17 @@ export class CoinTransactionService {
   }
 
   // ดึงประวัติธุรกรรม
-  static async getTransactionHistory(
-    clerkId: string,
+  async getTransactionHistory(
+    userId: string,
     page: number = 1,
     limit: number = 10
   ) {
     const skip = (page - 1) * limit;
 
-    console.log('Finding user with clerkId:', clerkId);
+    console.log('Finding user with userId:', userId);
     // หา userId จากตาราง User ก่อน
     const user = await prismaClient.user.findUnique({
-      where: { clerkId }
+      where: { id: userId }
     });
 
     console.log('Found user:', user);
@@ -155,3 +155,6 @@ export class CoinTransactionService {
     };
   }
 }
+
+export const coinTransactionService = new CoinTransactionService();
+export default coinTransactionService;

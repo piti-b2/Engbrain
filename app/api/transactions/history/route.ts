@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import { CoinTransactionService } from '@/services/coinTransactionService';
+import { CoinTransactionService, coinTransactionService } from "../../../../services/coinTransactionService";
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     console.log('API: Page:', page, 'Limit:', limit);
 
     // ดึงประวัติธุรกรรม
-    const history = await CoinTransactionService.getTransactionHistory(
+    const history = await coinTransactionService.getTransactionHistory(
       userId, // clerkId จาก auth()
       page,
       limit
