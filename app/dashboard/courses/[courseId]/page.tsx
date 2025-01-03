@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Button } from '@/components/ui/button';
+import { Button } from "../../../../components/ui/button";
 import { Clock, PlayCircle } from 'lucide-react';
-import { DEMO_COURSES } from '@/lib/demo-data';
-import { useToast } from "@/components/ui/use-toast";
+import { DEMO_COURSES } from "../../../../lib/demo-data";
+import { useToast } from "../../../../components/ui/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "../../../../components/ui/dialog";
 
 interface CoursePageProps {
   params: {
@@ -89,7 +89,7 @@ export default function CoursePage({ params }: CoursePageProps) {
     if (userCoins < course.book.priceCoins) {
       toast({
         title: "เหรียญไม่พอ",
-        description: `คุณมี 🪙 ${userCoins} เหรียญ ต้องใช้ 🪙 ${course.book.priceCoins} เหรียญ`,
+        description: `คุณมี เหรียญ ${userCoins} เหรียญ ต้องใช้ เหรียญ ${course.book.priceCoins} เหรียญ`,
         variant: "destructive"
       });
       setShowBookPurchaseDialog(false);
@@ -206,7 +206,7 @@ export default function CoursePage({ params }: CoursePageProps) {
                     height={16}
                     className="mr-2"
                   />
-                  สั่งซื้อหนังสือ <span className="text-lg ml-1">🪙</span> {course.book.priceCoins}
+                  สั่งซื้อหนังสือ <span className="text-lg ml-1"> </span> {course.book.priceCoins}
                 </Button>
               )}
             </div>
@@ -240,9 +240,9 @@ export default function CoursePage({ params }: CoursePageProps) {
           <DialogHeader>
             <DialogTitle>ยืนยันการสั่งซื้อหนังสือ</DialogTitle>
             <DialogDescription>
-              คุณต้องการสั่งซื้อหนังสือ "{course.book?.titleTh}" ในราคา <span className="text-lg">🪙</span> {course.book?.priceCoins} เหรียญใช่หรือไม่?
+              คุณต้องการสั่งซื้อหนังสือ "{course.book?.titleTh}" ในราคา <span className="text-lg"> </span> {course.book?.priceCoins} เหรียญใช่หรือไม่?
               <div className="mt-2 text-sm">
-                เหรียญคงเหลือ: <span className="text-lg">🪙</span> {userCoins}
+                เหรียญคงเหลือ: <span className="text-lg"> </span> {userCoins}
               </div>
             </DialogDescription>
           </DialogHeader>

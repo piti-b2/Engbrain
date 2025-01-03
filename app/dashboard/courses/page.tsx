@@ -1,7 +1,7 @@
 'use client'
 
-import { CourseCard } from '@/components/courses/CourseCard';
-import { DEMO_COURSES } from '@/lib/demo-data';
+import { CourseCard } from "../../../components/courses/CourseCard";
+import { DEMO_COURSES } from "../../../lib/demo-data";
 
 export default function CoursesPage() {
   const isThaiLanguage = true; // TODO: Implement language switching
