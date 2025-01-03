@@ -2,12 +2,12 @@
 
 import { useUser } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
-import DashboardComponent from "@/components/dashboard"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { useLanguage } from "@/context/LanguageContext"
+import DashboardComponent from "../../../components/dashboard"
+import { Card } from "../../../components/ui/card"
+import { Button } from "../../../components/ui/button"
+import { useLanguage } from "../../../context/LanguageContext"
 import { loadStripe } from '@stripe/stripe-js';
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "../../../components/ui/use-toast"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 

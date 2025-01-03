@@ -4,14 +4,14 @@ import * as React from "react"
 import { useState, useEffect } from 'react'
 import { Bell, BookOpen, CreditCard, Home, Menu, LucidePieChart, User, Globe, MessageSquare, PlusCircle, Wallet, PanelLeftClose, PanelLeftOpen, GraduationCap, Trophy, ScrollText, Gift, Gamepad2, PenTool, History, BookA, Lightbulb } from 'lucide-react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useLanguage } from '@/context/LanguageContext'
-import { translations } from '@/translations/index'
+import { Button } from "./ui/button"
+import { Card } from "./ui/card"
+import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet"
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover"
+import { useLanguage } from "../context/LanguageContext"
+import { translations } from "../translations/index"
 import { useUser } from "@clerk/nextjs"
-import { UserProfileMenu } from '@/components/user-profile-menu'
+import { UserProfileMenu } from "./user-profile-menu"
 
 export default function DashboardComponent({ children }: { children: React.ReactNode }) {
   const { language, setLanguage } = useLanguage()
