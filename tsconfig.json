@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@/components/ui/*": ["./components/ui/*"],  // เพิ่มบรรทัดนี้
       "@/components/*": ["./components/*"],  // เพิ่ม path สําหรับ components
       "@/*": ["./*"]
     }
