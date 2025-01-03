@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useLanguage } from "@/context/LanguageContext";
-import { translations } from "@/translations";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { useLanguage } from "../../../../context/LanguageContext";
+import { translations } from "../../../../translations";
+import { Input } from "../../../../components/ui/input";
+import { Button } from "../../../../components/ui/button";
+import { Card } from "../../../../components/ui/card";
 import { Search, Volume2, BookA } from "lucide-react";
 import Image from 'next/image';
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useAuth } from "@clerk/nextjs";  
-import { useToast } from "@/components/ui/use-toast";
-import { Toaster } from "@/components/ui/toaster";
+import { useToast } from "../../../../components/ui/use-toast";
+import { Toaster } from "../../../../components/ui/toaster";
 
 // เพิ่ม interface
 interface PhonicsSound {
