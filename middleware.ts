@@ -2,7 +2,7 @@ import { authMiddleware } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 import { rateLimitMiddleware } from './lib/rate-limit';
-import { prismaClient } from '@/lib/prisma'; 
+import { prismaClient } from './lib/prisma'; 
 
 const publicPaths = ["/", "/errors/time-skew"]; 
 
