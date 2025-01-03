@@ -4,15 +4,16 @@ import { useUser, SignOutButton } from "@clerk/nextjs"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useLanguage } from "@/context/LanguageContext"
-import { translations } from "@/translations"
-import { Badge } from "@/components/ui/badge"
+  DropdownMenuGroup,
+} from "./ui/dropdown-menu"
+import { useLanguage } from "../context/LanguageContext"
+import { translations } from "../translations"
+import { Badge } from "./ui/badge"
+import Image from "next/image"
 import {
   UserCircle,
   History,
@@ -48,11 +49,13 @@ export function UserProfileMenu() {
             </div>
           </div>
           <div className="h-8 w-8 rounded-full overflow-hidden">
-            {user.imageUrl && (
-              <img 
-                src={user.imageUrl} 
-                alt="Profile" 
-                className="h-full w-full object-cover"
+            {user?.imageUrl && (
+              <Image
+                src={user.imageUrl}
+                alt="Profile"
+                width={32}
+                height={32}
+                className="h-8 w-8 rounded-full"
               />
             )}
           </div>
