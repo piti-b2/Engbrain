@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@/components/*": ["./components/*"],  // เพิ่ม path สําหรับ components
       "@/*": ["./*"]
     }
   },
