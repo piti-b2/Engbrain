@@ -1,7 +1,7 @@
 'use client';
 
 import { SignUp } from "@clerk/nextjs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../../components/ui/card";
 import Image from "next/image";
 import { useState } from "react";
 

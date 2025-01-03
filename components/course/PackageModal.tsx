@@ -1,14 +1,14 @@
-import { useLanguage } from "@/context/LanguageContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge"; 
+import { useLanguage } from "../../context/LanguageContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { Card } from "../ui/card";
+import { Button } from "../ui/button";
+import { Badge } from "../ui/badge"; 
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Check, Timer, Sparkles, Tag, AlertCircle, Infinity, Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import PaymentModal from "./PaymentModal";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "../ui/use-toast";
 
 interface PackageModalProps {
   isOpen: boolean;
