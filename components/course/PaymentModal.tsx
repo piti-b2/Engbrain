@@ -1,12 +1,12 @@
 'use client';
 
-import { useLanguage } from "@/context/LanguageContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useLanguage } from "../../context/LanguageContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "../ui/use-toast";
 import { useUser } from "@clerk/nextjs";
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation';
