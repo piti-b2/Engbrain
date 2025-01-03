@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Card } from "../../../components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Button } from "../../../components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "../../../components/ui/table";
 import { Search, ArrowUpDown, Plus, Minus } from "lucide-react";
 
 const CoinManagement = () => {
