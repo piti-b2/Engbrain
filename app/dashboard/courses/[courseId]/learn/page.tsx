@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react';
-import { DEMO_COURSES } from '@/lib/demo-data';
-import { Button } from '@/components/ui/button';
+import { DEMO_COURSES } from "../../../../../lib/demo-data";
+import { Button } from "../../../../../components/ui/button";
 import { Clock, CheckCircle2, BookOpen, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
