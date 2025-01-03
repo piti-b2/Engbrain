@@ -1,9 +1,9 @@
-import DashboardComponent from '@/components/dashboard'
+import Dashboard from "../../../components/dashboard"
 
 export default function CoursesLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return <DashboardComponent>{children}</DashboardComponent>
+  return <Dashboard>{children}</Dashboard>
 }

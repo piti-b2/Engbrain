@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Noto_Sans_Thai } from "next/font/google";
 import "./globals.css";
-import { LanguageProvider } from '@/context/LanguageContext';
-import { Toaster } from "@/components/ui/toaster";
+import { LanguageProvider } from "../context/LanguageContext";
+import { Toaster } from "../components/ui/toaster";
 import '../lib/console-override';
 
 const notoSansThai = Noto_Sans_Thai({
