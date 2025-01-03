@@ -1,18 +1,18 @@
 'use client'
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
+import { Button } from "../../../../components/ui/button";
+import { Textarea } from "../../../../components/ui/textarea";
+import { useToast } from "../../../../components/ui/use-toast";
+import { DEMO_COURSES } from "../../../../lib/demo-data";
+import DashboardComponent from "../../../../components/dashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../../components/ui/tabs";
 import { ArrowLeft, Send, Clock, Save, PlayCircle, Coins, Diamond } from 'lucide-react';
 import Link from 'next/link';
-import { DEMO_COURSES } from '@/lib/demo-data';
-import DashboardComponent from '@/components/dashboard';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // เพิ่ม interface สำหรับสถานะการบ้าน
 interface HomeworkStatus {
-  status: 'draft' | 'submitted' | 'graded';
+  status: 'not_started' | 'draft' | 'submitted' | 'graded';
   lastSaved?: string;
   submittedAt?: string;
   submissionCount: number;
@@ -32,12 +32,12 @@ export default function HomeworkPage({ params }: HomeworkPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [homeworkStatus, setHomeworkStatus] = useState<HomeworkStatus>({
-    status: 'draft',
+    status: 'not_started',
     submissionCount: 0
   });
   const { toast } = useToast();
 
-  // แก้ไขการค้นหาการบ้าน
+  // หา homework จาก DEMO_COURSES
   const lesson = DEMO_COURSES.flatMap(course => 
     course.lessons?.map(lesson => ({
       ...lesson,
@@ -175,7 +175,7 @@ export default function HomeworkPage({ params }: HomeworkPageProps) {
               กลับไปที่บทเรียน
             </Link>
             <h1 className="text-2xl font-bold">{courseTitleTh}</h1>
-            <h2 className="text-xl">{lesson.titleTh}</h2>
+            <h2 className="text-xl">{homework.title}</h2>
           </div>
           {homeworkStatus.status === 'submitted' && (
             <div className="bg-green-100 text-green-800 px-4 py-2 rounded-md">
