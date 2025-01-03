@@ -1,15 +1,15 @@
 'use client';
 
-import { useLanguage } from "@/context/LanguageContext";
-import { translations } from "@/translations";
-import { Card } from "@/components/ui/card";
+import { useLanguage } from "../../../context/LanguageContext";
+import { translations } from "../../../translations";
+import { Card } from "../../../components/ui/card";
 import { BookA, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { useUser } from "@clerk/nextjs";
 import React from 'react';
-import PackageModal from "@/components/course/PackageModal";
+import PackageModal from "../../../components/course/PackageModal";
 
 interface Tool {
   id: string;

@@ -1,6 +1,6 @@
 'use client'
 
-import DashboardComponent from "@/components/dashboard"
+import DashboardComponent from "../../../components/dashboard"
 
 export default function ToolsLayout({
   children,

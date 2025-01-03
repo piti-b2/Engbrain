@@ -2,9 +2,9 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import DashboardComponent from '@/components/dashboard';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import DashboardComponent from "../../../../components/dashboard";
+import { Card } from "../../../../components/ui/card";
+import { Button } from "../../../../components/ui/button";
 
 export default function PaymentSuccessPage() {
   const router = useRouter();
