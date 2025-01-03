@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
 import { prismaClient } from "../../../lib/prisma";
-import logger from '@/lib/logger';
+import logger from '../../../lib/logger';
 import { Prisma, TransactionStatus } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 

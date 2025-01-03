@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs";
 import { NextResponse } from "next/server";
-import { prismaClient } from "@/lib/prisma";
+import { prismaClient } from "../../../../lib/prisma";
 
 export async function POST(request: Request) {
   console.log('API: Starting user profile endpoint');

@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { prismaClient } from '@/lib/prisma';
+import { prismaClient } from "../../../lib/prisma";
 import { CoinTransactionType, CoinTransactionReason, CoinTransactionStatus } from '@prisma/client';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
