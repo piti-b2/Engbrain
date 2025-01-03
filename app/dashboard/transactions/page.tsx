@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useLanguage } from '@/context/LanguageContext'
-import { translations } from '@/translations'
-import { Button } from "@/components/ui/button"
+import { useLanguage } from "../../../context/LanguageContext"
+import { translations } from "../../../translations"
+import { Button } from "../../../components/ui/button"
 import { Coins } from 'lucide-react'
 import { format } from 'date-fns'
-import TransactionsComponent from '@/components/transactions'
-import DashboardComponent from '@/components/dashboard'
+import TransactionsComponent from "../../../components/transactions"
+import DashboardComponent from "../../../components/dashboard"
 
 interface Transaction {
   id: string

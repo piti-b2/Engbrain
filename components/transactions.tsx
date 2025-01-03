@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useLanguage } from '@/context/LanguageContext'
-import { translations } from '@/translations'
+import { useLanguage } from '../context/LanguageContext'
+import { translations } from '../translations'
 import {
   Table,
   TableBody,
@@ -10,8 +10,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
+} from "./ui/table"
+import { Button } from "./ui/button"
 import { ChevronLeft, ChevronRight, Coins } from 'lucide-react'
 import { format } from 'date-fns'
 
