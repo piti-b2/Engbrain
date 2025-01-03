@@ -1,6 +1,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs";
-import { prismaClient } from "@/lib/prisma";
+import { prismaClient } from "../../../../lib/prisma";
 import { Prisma } from "@prisma/client";
 
 type ColorMapType = {

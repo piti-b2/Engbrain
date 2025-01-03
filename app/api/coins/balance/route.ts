@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs";
-import { prismaClient } from "@/lib/prisma";
+import { prismaClient } from "../../../../lib/prisma";
 
 export async function GET() {
   // เพิ่ม Timestamp สำหรับ Logging
